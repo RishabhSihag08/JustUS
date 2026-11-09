@@ -1,72 +1,81 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
-/// Delivery Status Icon - Shows message delivery status
-/// pending (clock), sent (single tick), delivered (double gray), read (double blue)
+/// Delivery Status Icon - Shows message delivery status using custom SVGs:
+/// - pending: schedule clock icon
+/// - sent: assets/icons/sent.svg (single checkmark)
+/// - delivered: assets/icons/recieved.svg (double checkmark)
+/// - read: assets/icons/read.svg (blue double checkmark)
 class DeliveryStatusIcon extends StatelessWidget {
   final String status;
   final double size;
+  final Color? color;
 
   const DeliveryStatusIcon({
     super.key,
     required this.status,
-    this.size = 16,
+    this.size = 15,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    Color iconColor;
-    IconData iconData;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final defaultTickColor = isDark ? const Color(0xFF8696A0) : AppColors.midGray;
 
     switch (status) {
       case 'pending':
-        iconColor = AppColors.statusPending;
-        iconData = Icons.schedule_rounded;
-        break;
+        return Icon(
+          Icons.schedule_rounded,
+          size: size,
+          color: color ?? AppColors.statusPending,
+        );
       case 'sent':
-        iconColor = AppColors.statusSent;
-        iconData = Icons.check_rounded;
-        break;
+        return SvgPicture.asset(
+          'assets/icons/sent.svg',
+          width: size,
+          height: size,
+          colorFilter: ColorFilter.mode(
+            color ?? defaultTickColor,
+            BlendMode.srcIn,
+          ),
+        );
       case 'delivered':
-        iconColor = AppColors.statusDelivered;
-        iconData = Icons.done_all_rounded;
-        break;
+        return SvgPicture.asset(
+          'assets/icons/recieved.svg',
+          width: size,
+          height: size,
+          colorFilter: ColorFilter.mode(
+            color ?? defaultTickColor,
+            BlendMode.srcIn,
+          ),
+        );
       case 'read':
-        iconColor = AppColors.statusRead;
-        iconData = Icons.done_all_rounded;
-        break;
+        return color != null
+            ? SvgPicture.asset(
+                'assets/icons/read.svg',
+                width: size,
+                height: size,
+                colorFilter: ColorFilter.mode(color!, BlendMode.srcIn),
+              )
+            : SvgPicture.asset(
+                'assets/icons/read.svg',
+                width: size,
+                height: size,
+              );
       default:
-        iconColor = AppColors.statusSent;
-        iconData = Icons.check_rounded;
+        return SvgPicture.asset(
+          'assets/icons/sent.svg',
+          width: size,
+          height: size,
+          colorFilter: ColorFilter.mode(
+            color ?? defaultTickColor,
+            BlendMode.srcIn,
+          ),
+        );
     }
-
-    return status == 'delivered' || status == 'read'
-        ? _buildDoubleTick(iconColor, size)
-        : Icon(
-            iconData,
-            size: size,
-            color: iconColor,
-          );
-  }
-
-  Widget _buildDoubleTick(Color color, double size) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.check_rounded,
-          size: size,
-          color: color,
-        ),
-        SizedBox(width: size * 0.15),
-        Icon(
-          Icons.check_rounded,
-          size: size,
-          color: color,
-        ),
-      ],
-    );
   }
 }
 
@@ -74,11 +83,13 @@ class DeliveryStatusIcon extends StatelessWidget {
 class AnimatedDeliveryStatusIcon extends StatefulWidget {
   final String status;
   final double size;
+  final Color? color;
 
   const AnimatedDeliveryStatusIcon({
     super.key,
     required this.status,
-    this.size = 16,
+    this.size = 15,
+    this.color,
   });
 
   @override
@@ -154,6 +165,7 @@ class _AnimatedDeliveryStatusIconState extends State<AnimatedDeliveryStatusIcon>
             child: DeliveryStatusIcon(
               status: widget.status,
               size: widget.size,
+              color: widget.color,
             ),
           ),
         );

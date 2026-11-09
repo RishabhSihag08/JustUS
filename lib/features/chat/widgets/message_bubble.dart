@@ -10,7 +10,7 @@ import '../../../domain/enums.dart';
 import 'delivery_status_icon.dart';
 import 'voice_note_player.dart';
 
-/// Message Bubble - Clean Slack-styled message bubble
+/// Message Bubble - WhatsApp-blended reactions & SVG read receipts
 class MessageBubble extends ConsumerWidget {
   final bool isSent;
   final Map<String, dynamic>? message;
@@ -54,6 +54,8 @@ class MessageBubble extends ConsumerWidget {
     final isViewOnce = domainMessage?.type == MessageType.viewOnce || (message?['isViewOnce'] as bool? ?? false);
     final isViewOnceViewed = domainMessage?.viewOnceViewed ?? (message?['viewOnceViewed'] as bool? ?? false);
 
+    final hasReactions = reactions.isNotEmpty || ((message?['reactions'] as List?)?.isNotEmpty ?? false);
+
     return Align(
       alignment: isSent ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -62,28 +64,40 @@ class MessageBubble extends ConsumerWidget {
         child: Container(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.78,
+            minWidth: hasReactions ? 75 : 0,
           ),
           margin: EdgeInsets.only(
-            bottom: 6,
+            bottom: hasReactions ? 14 : 5,
             left: isSent ? 48 : 12,
             right: isSent ? 12 : 48,
           ),
-          child: Column(
-            crossAxisAlignment: isSent ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              // Reply preview bar
-              if (repliedMessage != null || message?['replyTo'] != null)
-                _buildReplyPreview(theme, colorScheme, isDark),
+              // Unified Bubble (contains reply preview if any, message content, and footer)
+              _buildBubble(
+                context,
+                type,
+                text,
+                mediaUrl,
+                domainMessage?.mediaDuration,
+                isViewOnce,
+                isViewOnceViewed,
+                time,
+                status,
+                isStarred,
+                theme,
+                colorScheme,
+                isDark,
+              ),
 
-              // Main bubble
-              _buildBubble(context, type, text, mediaUrl, domainMessage?.mediaDuration, isViewOnce, isViewOnceViewed, theme, colorScheme, isDark),
-
-              // Timestamp and status footer
-              _buildFooter(time, status, isStarred, theme, colorScheme, isDark),
-
-              // Reactions
-              if (reactions.isNotEmpty || ((message?['reactions'] as List?)?.isNotEmpty ?? false))
-                _buildReactions(theme, colorScheme, isDark),
+              // WhatsApp-style blended reaction badge
+              if (hasReactions)
+                Positioned(
+                  bottom: -10,
+                  left: 12,
+                  child: _buildReactionBadge(isDark),
+                ),
             ],
           ),
         ),
@@ -91,6 +105,7 @@ class MessageBubble extends ConsumerWidget {
     );
   }
 
+  /// Reply preview bar inside or above the bubble
   Widget _buildReplyPreview(ThemeData theme, ColorScheme colorScheme, bool isDark) {
     String senderName = 'Reply';
     String replyText = '';
@@ -99,28 +114,29 @@ class MessageBubble extends ConsumerWidget {
       senderName = (repliedMessage!.senderId == currentUserId)
           ? 'You'
           : (otherUserName ?? 'Partner');
-      replyText = switch (repliedMessage!.type) {
-        MessageType.voice => '🎤 Voice note',
-        MessageType.image => '📷 Photo',
-        MessageType.video => '🎥 Video',
-        MessageType.viewOnce => '🔒 View-once media',
-        _ => repliedMessage!.content ?? '',
-      };
+      replyText = repliedMessage!.content ??
+          (repliedMessage!.type == MessageType.voice
+              ? 'Voice note'
+              : (repliedMessage!.type == MessageType.image
+                  ? 'Photo'
+                  : 'Media'));
     } else if (message?['replyTo'] != null) {
-      final reply = message?['replyTo'] as Map<String, dynamic>? ?? {};
-      senderName = reply['senderName'] as String? ?? 'Reply';
-      replyText = reply['text'] as String? ?? '';
+      final replyData = message!['replyTo'] as Map<String, dynamic>;
+      senderName = replyData['senderName'] as String? ?? 'Reply';
+      replyText = replyData['text'] as String? ?? '';
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2A2D32) : AppColors.purpleHaze,
+        color: isDark
+            ? (isSent ? const Color(0xFF280E2E) : const Color(0xFF1E2125))
+            : (isSent ? const Color(0xFFEEDDFF) : const Color(0xFFEFEBF1)),
         borderRadius: BorderRadius.circular(6),
-        border: const Border(
+        border: Border(
           left: BorderSide(
-            color: AppColors.aubergine,
+            color: isSent ? AppColors.aubergine : AppColors.channelBlue,
             width: 3,
           ),
         ),
@@ -130,8 +146,8 @@ class MessageBubble extends ConsumerWidget {
         children: [
           Text(
             senderName,
-            style: const TextStyle(
-              color: AppColors.aubergine,
+            style: TextStyle(
+              color: isSent ? AppColors.aubergine : AppColors.channelBlue,
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -159,29 +175,40 @@ class MessageBubble extends ConsumerWidget {
     int? mediaDuration,
     bool isViewOnce,
     bool isViewOnceViewed,
+    String time,
+    String status,
+    bool isStarred,
     ThemeData theme,
     ColorScheme colorScheme,
     bool isDark,
   ) {
     final messageId = domainMessage?.id ?? (message?['id'] as String? ?? '');
     if (isViewOnce || type == 'viewOnce' || type == 'view_once') {
-      return _buildViewOnceBubble(context, messageId, isViewOnceViewed, isDark);
+      return _buildViewOnceBubble(context, messageId, isViewOnceViewed, time, status, isStarred, isDark);
     }
     switch (type) {
       case 'text':
-        return _buildTextBubble(text, isDark);
+        return _buildTextBubble(theme, colorScheme, text, time, status, isStarred, isDark);
       case 'image':
       case 'video':
-        return _buildMediaBubble(type, text, mediaUrl, isViewOnce, isViewOnceViewed, colorScheme, isDark);
+        return _buildMediaBubble(type, text, mediaUrl, isViewOnce, isViewOnceViewed, time, status, isStarred, colorScheme, isDark);
       case 'voice':
-        return _buildVoiceBubble(mediaUrl, mediaDuration, isDark);
+        return _buildVoiceBubble(mediaUrl, mediaDuration, time, status, isStarred, isDark);
       default:
-        return _buildTextBubble(text, isDark);
+        return _buildTextBubble(theme, colorScheme, text, time, status, isStarred, isDark);
     }
   }
 
-  Widget _buildTextBubble(String text, bool isDark) {
-    // Slack-inspired minimalist bubbles
+  /// Compact text bubble with inline or bottom-aligned timestamp + SVG read receipt
+  Widget _buildTextBubble(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    String text,
+    String time,
+    String status,
+    bool isStarred,
+    bool isDark,
+  ) {
     final bgColor = isSent
         ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
         : (isDark ? const Color(0xFF222529) : Colors.white);
@@ -190,8 +217,10 @@ class MessageBubble extends ConsumerWidget {
         : (isDark ? const Color(0xFF35373B) : AppColors.fog);
     final textColor = isDark ? Colors.white : AppColors.carbon;
 
+    final hasReply = repliedMessage != null || message?['replyTo'] != null;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.only(
@@ -202,14 +231,26 @@ class MessageBubble extends ConsumerWidget {
         ),
         border: Border.all(color: borderColor, width: 1),
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: textColor,
-          fontSize: 15,
-          height: 1.4,
-          fontWeight: FontWeight.w400,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasReply) _buildReplyPreview(theme, colorScheme, isDark),
+          Text(
+            text,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 15,
+              height: 1.35,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: _buildFooterRow(time, status, isStarred, isDark),
+          ),
+        ],
       ),
     );
   }
@@ -220,11 +261,18 @@ class MessageBubble extends ConsumerWidget {
     String? mediaUrl,
     bool isViewOnce,
     bool isViewOnceViewed,
+    String time,
+    String status,
+    bool isStarred,
     ColorScheme colorScheme,
     bool isDark,
   ) {
-    final bgColor = isDark ? const Color(0xFF222529) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF35373B) : AppColors.fog;
+    final bgColor = isSent
+        ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
+        : (isDark ? const Color(0xFF222529) : Colors.white);
+    final borderColor = isSent
+        ? (isDark ? const Color(0xFF611F69) : AppColors.lavenderMist)
+        : (isDark ? const Color(0xFF35373B) : AppColors.fog);
 
     Widget mediaWidget;
     if (mediaUrl != null && File(mediaUrl).existsSync()) {
@@ -260,7 +308,7 @@ class MessageBubble extends ConsumerWidget {
             mediaWidget,
             if (text.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 2),
                 child: Text(
                   text,
                   style: TextStyle(
@@ -269,6 +317,13 @@ class MessageBubble extends ConsumerWidget {
                   ),
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 2, 10, 6),
+              child: Align(
+                alignment: Alignment.bottomRight,
+                child: _buildFooterRow(time, status, isStarred, isDark),
+              ),
+            ),
           ],
         ),
       ),
@@ -279,18 +334,25 @@ class MessageBubble extends ConsumerWidget {
     return Container(
       width: 240,
       height: 160,
-      color: const Color(0xFFF0EDF2),
+      color: colorScheme.surfaceContainerHighest,
       child: Center(
         child: Icon(
-          type == 'image' ? Icons.image_outlined : Icons.videocam_outlined,
-          size: 44,
-          color: AppColors.midGray,
+          type == 'image' ? Icons.image_rounded : Icons.videocam_rounded,
+          color: colorScheme.onSurfaceVariant,
+          size: 48,
         ),
       ),
     );
   }
 
-  Widget _buildVoiceBubble(String? mediaUrl, int? mediaDuration, bool isDark) {
+  Widget _buildVoiceBubble(
+    String? mediaUrl,
+    int? mediaDuration,
+    String time,
+    String status,
+    bool isStarred,
+    bool isDark,
+  ) {
     final bgColor = isSent
         ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
         : (isDark ? const Color(0xFF222529) : Colors.white);
@@ -299,16 +361,24 @@ class MessageBubble extends ConsumerWidget {
         : (isDark ? const Color(0xFF35373B) : AppColors.fog);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor, width: 1),
       ),
-      child: VoiceNotePlayer(
-        audioUrl: mediaUrl,
-        duration: mediaDuration != null ? Duration(milliseconds: mediaDuration) : null,
-        isSent: isSent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          VoiceNotePlayer(
+            audioUrl: mediaUrl,
+            duration: mediaDuration != null ? Duration(milliseconds: mediaDuration) : null,
+            isSent: isSent,
+          ),
+          const SizedBox(height: 3),
+          _buildFooterRow(time, status, isStarred, isDark),
+        ],
       ),
     );
   }
@@ -317,6 +387,9 @@ class MessageBubble extends ConsumerWidget {
     BuildContext context,
     String messageId,
     bool isViewOnceViewed,
+    String time,
+    String status,
+    bool isStarred,
     bool isDark,
   ) {
     final bgColor = isSent
@@ -346,29 +419,37 @@ class MessageBubble extends ConsumerWidget {
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: borderColor, width: 1),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                isViewOnceViewed ? Icons.check_circle_outline_rounded : Icons.lock_clock_outlined,
-                color: isViewOnceViewed ? AppColors.success : AppColors.warning,
-                size: 20,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isViewOnceViewed ? Icons.check_circle_outline_rounded : Icons.lock_clock_outlined,
+                    color: isViewOnceViewed ? AppColors.success : AppColors.warning,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isViewOnceViewed ? 'Opened view-once' : 'View Once Media',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.carbon,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                isViewOnceViewed ? 'Opened view-once' : 'View Once Media',
-                style: TextStyle(
-                  color: isDark ? Colors.white : AppColors.carbon,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              const SizedBox(height: 2),
+              _buildFooterRow(time, status, isStarred, isDark),
             ],
           ),
         ),
@@ -376,142 +457,122 @@ class MessageBubble extends ConsumerWidget {
     );
   }
 
-  Widget _buildFooter(
+  /// Compact timestamp + SVG delivery status tick row
+  Widget _buildFooterRow(
     String time,
     String status,
     bool isStarred,
-    ThemeData theme,
-    ColorScheme colorScheme,
     bool isDark,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (isStarred) ...[
-            const Icon(
-              Icons.star_rounded,
-              size: 13,
-              color: AppColors.warning,
-            ),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            time,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.midGray,
-              fontWeight: FontWeight.w400,
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isStarred) ...[
+          const Icon(
+            Icons.star_rounded,
+            size: 11,
+            color: AppColors.warning,
           ),
-          if (isSent) ...[
-            const SizedBox(width: 4),
-            DeliveryStatusIcon(status: status),
-          ],
+          const SizedBox(width: 3),
         ],
-      ),
+        Text(
+          time,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark ? Colors.white54 : AppColors.midGray,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        if (isSent) ...[
+          const SizedBox(width: 4),
+          DeliveryStatusIcon(status: status, size: 14),
+        ],
+      ],
     );
   }
 
-  Widget _buildReactions(ThemeData theme, ColorScheme colorScheme, bool isDark) {
-    if (reactions.isEmpty) {
+  /// Blended reaction badge overlapping the bottom edge of the bubble (WhatsApp-style)
+  Widget _buildReactionBadge(bool isDark) {
+    final Map<String, List<Reaction>> grouped = {};
+    if (reactions.isNotEmpty) {
+      for (final r in reactions) {
+        grouped.putIfAbsent(r.emoji, () => []).add(r);
+      }
+    } else {
       final legacy = message?['reactions'] as List<dynamic>? ?? [];
-      if (legacy.isEmpty) return const SizedBox.shrink();
-      final Map<String, int> counts = {};
       for (final r in legacy) {
         final emoji = r['emoji'] as String? ?? '❤️';
-        counts[emoji] = (counts[emoji] ?? 0) + 1;
+        grouped.putIfAbsent(emoji, () => []).add(
+          Reaction(
+            messageId: domainMessage?.id ?? '',
+            userId: '',
+            emoji: emoji,
+            createdAt: DateTime.now(),
+          ),
+        );
       }
-
-      return Padding(
-        padding: const EdgeInsets.only(top: 3),
-        child: Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: counts.entries.map((e) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2A2D32) : const Color(0xFFF0EDF2),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF35373B) : AppColors.fog,
-                ),
-              ),
-              child: Text(
-                '${e.key} ${e.value}',
-                style: const TextStyle(fontSize: 12),
-              ),
-            );
-          }).toList(),
-        ),
-      );
     }
 
-    final Map<String, List<Reaction>> grouped = {};
-    for (final r in reactions) {
-      grouped.putIfAbsent(r.emoji, () => []).add(r);
-    }
+    if (grouped.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: grouped.entries.map((entry) {
-          final emoji = entry.key;
-          final count = entry.value.length;
-          final isMeReacted = currentUserId != null &&
-              entry.value.any((r) => r.userId == currentUserId);
+    final totalCount = grouped.values.fold<int>(0, (sum, list) => sum + list.length);
+    final firstEmoji = grouped.keys.first;
 
-          final pillBg = isMeReacted
-              ? (isDark ? const Color(0xFF4A154B).withValues(alpha: 0.6) : AppColors.purpleHaze)
-              : (isDark ? const Color(0xFF2A2D32) : const Color(0xFFF0EDF2));
+    // Background matches bubble color, border matches chat background for the cutout look
+    final badgeBg = isSent
+        ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
+        : (isDark ? const Color(0xFF222529) : Colors.white);
 
-          final pillBorder = isMeReacted
-              ? AppColors.aubergine
-              : (isDark ? const Color(0xFF35373B) : AppColors.fog);
+    final cutoutBorderColor = isDark ? const Color(0xFF1A1D21) : AppColors.softWhite;
 
-          return GestureDetector(
-            onTap: () => onReactionTap?.call(emoji),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: pillBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: pillBorder,
-                  width: isMeReacted ? 1.5 : 1.0,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    emoji,
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  if (count > 1) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '$count',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: isMeReacted ? FontWeight.w700 : FontWeight.w500,
-                        color: isMeReacted
-                            ? (isDark ? Colors.white : AppColors.aubergine)
-                            : (isDark ? Colors.white70 : AppColors.charcoal),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+    return GestureDetector(
+      onTap: () => onReactionTap?.call(firstEmoji),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: totalCount > 1
+            ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2)
+            : const EdgeInsets.all(3.5),
+        decoration: BoxDecoration(
+          color: badgeBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: cutoutBorderColor,
+            width: 2.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 3,
+              offset: const Offset(0, 1.5),
             ),
-          );
-        }).toList(),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...grouped.entries.map((entry) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1),
+                child: Text(
+                  entry.key,
+                  style: const TextStyle(fontSize: 12, height: 1.1),
+                ),
+              );
+            }),
+            if (totalCount > 1) ...[
+              const SizedBox(width: 3),
+              Text(
+                '$totalCount',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : AppColors.charcoal,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

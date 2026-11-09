@@ -87,6 +87,7 @@ dependencies:
   stream_transform: ^2.1.0
   path: ^1.9.0
   haptic_feedback: ^0.4.2
+  flutter_svg: ^2.3.2
 
 dependency_overrides:
   record_linux: ^1.2.1
@@ -110,6 +111,7 @@ flutter:
   assets:
     - assets/.env
     - assets/images/
+    - assets/icons/
     - assets/audio/notification.aac
 
   # Fonts
