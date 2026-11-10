@@ -216,23 +216,23 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
               height: 38,
               decoration: BoxDecoration(
                 color: widget.isSent
-                    ? AppColors.aubergine
-                    : (isDark ? const Color(0xFF2E3136) : const Color(0xFFE8E5EC)),
+                    ? AppColors.roseMauve
+                    : AppColors.mulberryWine,
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: _isLoading
-                    ? SizedBox(
+                    ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: widget.isSent ? Colors.white : AppColors.aubergine,
+                          color: Colors.white,
                         ),
                       )
                     : Icon(
                         _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        color: widget.isSent ? Colors.white : AppColors.aubergine,
+                        color: Colors.white,
                         size: 24,
                       ),
               ),
@@ -261,8 +261,8 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
                     animationValue: _waveController.value,
                     isPlaying: _isPlaying,
                     progressFraction: progressFraction,
-                    activeColor: widget.isSent ? (isDark ? Colors.white : AppColors.aubergine) : AppColors.aubergine,
-                    inactiveColor: secondaryColor.withValues(alpha: 0.35),
+                    activeColor: AppColors.roseMauve,
+                    inactiveColor: AppColors.roseMauve.withValues(alpha: 0.25),
                   ),
                 ),
               );
@@ -298,13 +298,13 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
                 color: _playbackSpeed > 1.0
-                    ? AppColors.aubergine.withValues(alpha: 0.15)
+                    ? AppColors.mulberryWine.withValues(alpha: 0.25)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: _playbackSpeed > 1.0
-                      ? AppColors.aubergine.withValues(alpha: 0.4)
-                      : (isDark ? const Color(0xFF35373B) : AppColors.fog),
+                      ? AppColors.roseMauve.withValues(alpha: 0.5)
+                      : AppColors.borderDark,
                 ),
               ),
               child: Text(
@@ -312,7 +312,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer>
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: _playbackSpeed > 1.0 ? AppColors.aubergine : secondaryColor,
+                  color: _playbackSpeed > 1.0 ? AppColors.roseMauve : secondaryColor,
                 ),
               ),
             ),

@@ -402,10 +402,10 @@ class _PinPadScreenState extends ConsumerState<PinPadScreen>
       height: keySize,
       margin: EdgeInsets.symmetric(horizontal: hMargin),
       decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark ? const Color(0xFF2A2D32) : Colors.white,
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(keySize / 2),
         border: Border.all(
-          color: theme.brightness == Brightness.dark ? const Color(0xFF35373B) : AppColors.fog,
+          color: AppColors.borderDark,
           width: 1.5,
         ),
       ),

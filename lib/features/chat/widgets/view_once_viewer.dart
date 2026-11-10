@@ -103,21 +103,21 @@ class _ViewOnceViewerScreenState extends ConsumerState<ViewOnceViewerScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1D1C1D).withValues(alpha: 0.85),
+                    color: AppColors.obsidianCharcoal.withValues(alpha: 0.90),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: AppColors.roseMauve.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppColors.aubergine.withValues(alpha: 0.3),
+                          color: AppColors.mulberryWine.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
                           Icons.lock_clock_outlined,
-                          color: Colors.white,
+                          color: AppColors.roseMauve,
                           size: 18,
                         ),
                       ),
@@ -153,13 +153,13 @@ class _ViewOnceViewerScreenState extends ConsumerState<ViewOnceViewerScreen> {
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
+                        color: AppColors.obsidianCharcoal.withValues(alpha: 0.8),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white24),
+                        border: Border.all(color: AppColors.roseMauve.withValues(alpha: 0.4)),
                       ),
                       child: const Icon(
                         Icons.close_rounded,
-                        color: Colors.white,
+                        color: AppColors.roseMauve,
                         size: 20,
                       ),
                     ),
@@ -176,7 +176,7 @@ class _ViewOnceViewerScreenState extends ConsumerState<ViewOnceViewerScreen> {
   Widget _buildMediaContent() {
     if (_isLoading) {
       return const CircularProgressIndicator(
-        color: AppColors.aubergine,
+        color: AppColors.roseMauve,
       );
     }
 

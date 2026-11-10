@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,9 +7,12 @@ import 'package:go_router/go_router.dart';
 import '../../core/security/device_lock_service.dart';
 import '../../core/security/session_manager.dart';
 import '../../core/theme/app_colors.dart';
+import '../../domain/enums.dart';
 import '../../domain/models/message.dart';
 import '../../providers/chat_visibility_provider.dart';
+import '../../services/gallery_saver_service.dart';
 import 'chat_notifier.dart';
+import 'widgets/enlarged_media_viewer.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/message_input_bar.dart';
 import 'widgets/presence_header.dart';
@@ -25,6 +29,9 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
+  String? _highlightedMessageId;
+  Timer? _highlightTimer;
+  final Map<String, GlobalKey> _messageKeys = {};
 
   @override
   void initState() {
@@ -54,6 +61,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _highlightTimer?.cancel();
     ref.read(chatNotifierProvider.notifier).setPresence(false);
     ref.read(isChatActiveProvider.notifier).setActive(false);
     _scrollController.dispose();
@@ -70,6 +78,127 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     }
   }
 
+  /// Scroll smoothly to a specific message and flash a highlight for 500ms
+  void _scrollToAndHighlightMessage(String targetMessageId) {
+    final chatState = ref.read(chatNotifierProvider);
+    final reversedMessages = chatState.messages.reversed.toList();
+    final targetIndex = reversedMessages.indexWhere((m) => m.id == targetMessageId);
+
+    if (targetIndex == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Original message not found in conversation'),
+          duration: Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final key = _messageKeys[targetMessageId];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.5,
+      );
+    } else {
+      final estimatedOffset = (targetIndex * 75.0).clamp(
+        0.0,
+        _scrollController.hasClients ? _scrollController.position.maxScrollExtent : 0.0,
+      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          estimatedOffset,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOutCubic,
+        ).then((_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final postKey = _messageKeys[targetMessageId];
+            if (postKey?.currentContext != null) {
+              Scrollable.ensureVisible(
+                postKey!.currentContext!,
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.easeOut,
+                alignment: 0.5,
+              );
+            }
+          });
+        });
+      }
+    }
+
+    setState(() {
+      _highlightedMessageId = targetMessageId;
+    });
+
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _highlightedMessageId = null;
+        });
+      }
+    });
+  }
+
+  /// Save media from long-press or actions directly to Android Gallery
+  Future<void> _saveMediaToGallery(BuildContext context, String mediaUrl) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.roseMauve,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Saving to Gallery...',
+              style: TextStyle(color: AppColors.titaniumText),
+            ),
+          ],
+        ),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    final success = await GallerySaverService.saveToGallery(mediaUrl);
+    if (!mounted) return;
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              success ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+              color: success ? const Color(0xFF2EB67D) : const Color(0xFFE01E5A),
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              success ? 'Saved to Gallery' : 'Failed to save to Gallery',
+              style: const TextStyle(
+                color: AppColors.titaniumText,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _showMessageActionSheet(
     BuildContext context,
     Message message,
@@ -79,7 +208,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   ) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF222529) : Colors.white,
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -124,7 +253,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                   ),
                 ),
                 Divider(
-                  color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+                  color: isDark ? const Color(0xFF4A2641) : AppColors.borderDark,
                   height: 1,
                 ),
 
@@ -132,12 +261,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                 ListTile(
                   leading: Icon(
                     Icons.reply_rounded,
-                    color: isDark ? const Color(0xFFD1D2D3) : AppColors.charcoal,
+                    color: isDark ? AppColors.roseMauve : AppColors.roseMauve,
                   ),
                   title: Text(
                     'Reply in thread',
                     style: TextStyle(
-                      color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                      color: isDark ? AppColors.pureWhite : AppColors.pureWhite,
                     ),
                   ),
                   onTap: () {
@@ -151,12 +280,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                   ListTile(
                     leading: Icon(
                       Icons.copy_rounded,
-                      color: isDark ? const Color(0xFFD1D2D3) : AppColors.charcoal,
+                      color: isDark ? AppColors.roseMauve : AppColors.roseMauve,
                     ),
                     title: Text(
                       'Copy text',
                       style: TextStyle(
-                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                        color: isDark ? AppColors.pureWhite : AppColors.pureWhite,
                       ),
                     ),
                     onTap: () {
@@ -178,13 +307,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                         ? Icons.star_rounded
                         : Icons.star_border_rounded,
                     color: message.isStarred
-                        ? const Color(0xFFECB22E)
-                        : (isDark ? const Color(0xFFD1D2D3) : AppColors.charcoal),
+                        ? AppColors.roseMauve
+                        : (isDark ? AppColors.mutedMauve : AppColors.mutedMauve),
                   ),
                   title: Text(
                     message.isStarred ? 'Unstar message' : 'Star message',
                     style: TextStyle(
-                      color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                      color: isDark ? AppColors.pureWhite : AppColors.pureWhite,
                     ),
                   ),
                   onTap: () {
@@ -192,6 +321,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                     notifier.toggleStar(message.id);
                   },
                 ),
+
+                // Save to Gallery (for media messages: image & video)
+                if (message.mediaUrl != null &&
+                    message.mediaUrl!.isNotEmpty &&
+                    (message.type == MessageType.image || message.type == MessageType.video))
+                  ListTile(
+                    leading: const Icon(
+                      Icons.download_rounded,
+                      color: AppColors.roseMauve,
+                    ),
+                    title: const Text(
+                      'Save to Gallery',
+                      style: TextStyle(
+                        color: AppColors.pureWhite,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      await _saveMediaToGallery(context, message.mediaUrl!);
+                    },
+                  ),
 
                 // Delete for me
                 ListTile(
@@ -206,6 +357,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                   onTap: () {
                     Navigator.pop(sheetContext);
                     notifier.deleteForMe(message.id);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: const Color(0xFF2E1729),
+                        content: const Row(
+                          children: [
+                            Icon(Icons.delete_outline_rounded, color: Color(0xFFE01E5A), size: 20),
+                            SizedBox(width: 10),
+                            Text(
+                              'Message deleted for you',
+                              style: TextStyle(color: AppColors.titaniumText, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color(0xFF5A2A4E), width: 1),
+                        ),
+                      ),
+                    );
                   },
                 ),
 
@@ -258,8 +430,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF222529) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: AppColors.dialogDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppColors.borderDark, width: 1),
+          ),
           title: Row(
             children: [
               Container(
@@ -281,7 +456,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : AppColors.carbon,
+                    color: isDark ? AppColors.pureWhite : AppColors.carbon,
                   ),
                 ),
               ),
@@ -296,7 +471,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.4,
-                  color: isDark ? const Color(0xFFD1D2D3) : AppColors.charcoal,
+                  color: isDark ? AppColors.titaniumText : AppColors.charcoal,
                 ),
               ),
               const SizedBox(height: 12),
@@ -338,7 +513,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
               child: Text(
                 'Cancel',
                 style: TextStyle(
-                  color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                  color: isDark ? AppColors.mutedMauve : AppColors.midGray,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -355,10 +530,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                 Navigator.pop(dialogCtx);
                 notifier.deleteForEveryone(message.id);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Message deleted for everyone'),
-                    duration: Duration(seconds: 2),
+                  SnackBar(
+                    backgroundColor: const Color(0xFF2E1729),
+                    content: const Row(
+                      children: [
+                        Icon(Icons.delete_sweep_rounded, color: Color(0xFFE01E5A), size: 20),
+                        SizedBox(width: 10),
+                        Text(
+                          'Message deleted for everyone',
+                          style: TextStyle(color: AppColors.titaniumText, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                    duration: const Duration(seconds: 2),
                     behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFF5A2A4E), width: 1),
+                    ),
                   ),
                 );
               },
@@ -397,7 +586,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         DeviceLockService.moveTaskToBack();
       },
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF1A1D21) : AppColors.softWhite,
+        backgroundColor: AppColors.obsidianVoid,
         body: SafeArea(
           child: Column(
             children: [
@@ -408,50 +597,78 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                 onSettingsTap: () => context.push('/chat/settings'),
               ),
 
-              // Message Body
+              // Message Body with Velvet & Obsidian Themed Doodle Wallpaper
               Expanded(
-                child: messages.isEmpty
-                    ? _buildEmptyState(otherUserName, isDark)
-                    : ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final message = messages[index];
-                          final isMe = message.senderId == currentUserId;
-                          final replyToMessage = message.replyToId != null
-                              ? chatState.messages.where((m) => m.id == message.replyToId).firstOrNull
-                              : null;
-                          final messageReactions = chatState.reactionsByMessageId[message.id] ?? const [];
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.obsidianVoid,
+                    image: DecorationImage(
+                      image: AssetImage('assets/images/chat_bg.png'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  child: messages.isEmpty
+                      ? _buildEmptyState(otherUserName, isDark)
+                      : ListView.builder(
+                          controller: _scrollController,
+                          reverse: true,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            final isMe = message.senderId == currentUserId;
+                            final replyToMessage = message.replyToId != null
+                                ? chatState.messages.where((m) => m.id == message.replyToId).firstOrNull
+                                : null;
+                            final messageReactions = chatState.reactionsByMessageId[message.id] ?? const [];
+                            final bubbleKey = _messageKeys.putIfAbsent(message.id, () => GlobalKey());
 
-                          return SwipeToReply(
-                            key: ValueKey('swipe_${message.id}'),
-                            onReply: () => notifier.startReply(message),
-                            child: MessageBubble(
-                              key: ValueKey(message.id),
-                              domainMessage: message,
-                              isSent: isMe,
-                              reactions: messageReactions,
-                              currentUserId: currentUserId,
-                              repliedMessage: replyToMessage,
-                              otherUserName: otherUserName,
-                              onReactionTap: (emoji) => notifier.addReaction(message.id, emoji),
+                            return SwipeToReply(
+                              key: ValueKey('swipe_${message.id}'),
                               onReply: () => notifier.startReply(message),
-                              onLongPress: () => _showMessageActionSheet(
-                                context,
-                                message,
-                                isMe,
-                                notifier,
-                                isDark,
+                              child: MessageBubble(
+                                key: bubbleKey,
+                                domainMessage: message,
+                                isSent: isMe,
+                                reactions: messageReactions,
+                                currentUserId: currentUserId,
+                                repliedMessage: replyToMessage,
+                                otherUserName: otherUserName,
+                                isHighlighted: _highlightedMessageId == message.id,
+                                onReplyPreviewTap: replyToMessage != null
+                                    ? () => _scrollToAndHighlightMessage(replyToMessage.id)
+                                    : null,
+                                onMediaTap: (message.mediaUrl != null && message.mediaUrl!.isNotEmpty)
+                                    ? () {
+                                        EnlargedMediaViewer.open(
+                                          context,
+                                          mediaUrl: message.mediaUrl!,
+                                          caption: message.content != null && message.content!.isNotEmpty
+                                              ? message.content
+                                              : null,
+                                          senderName: isMe ? 'You' : otherUserName,
+                                          timestamp: message.createdAt,
+                                          heroTag: 'media_${message.id}',
+                                        );
+                                      }
+                                    : null,
+                                onReactionTap: (emoji) => notifier.addReaction(message.id, emoji),
+                                onReply: () => notifier.startReply(message),
+                                onLongPress: () => _showMessageActionSheet(
+                                  context,
+                                  message,
+                                  isMe,
+                                  notifier,
+                                  isDark,
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                            );
+                          },
+                        ),
+                ),
               ),
 
               // Animated Typing Indicator matching reference GIF
@@ -502,42 +719,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF222529) : AppColors.purpleHaze,
+                color: AppColors.toneOfDarkGrey,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF35373B) : AppColors.lavenderMist,
-                  width: 1,
+                  color: AppColors.borderDark,
+                  width: 1.5,
                 ),
               ),
               child: const Center(
-                child: Text(
-                  '#',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.aubergine,
-                  ),
+                child: Icon(
+                  Icons.explore_rounded,
+                  size: 32,
+                  color: AppColors.roseMauve,
                 ),
               ),
             ),
             const SizedBox(height: 20),
             Text(
-              'This is the start of your direct conversation with $partnerName',
+              'This is the start of your encrypted sanctuary with $partnerName',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                color: AppColors.pureWhite,
                 height: 1.3,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'All messages, media, and voice notes are private, encrypted, and synchronized in real time.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: isDark ? const Color(0xFFABABAD) : AppColors.charcoal,
+                color: AppColors.mutedMauve,
                 height: 1.4,
               ),
             ),

@@ -13,6 +13,7 @@ import '../pin_pad/pin_pad_notifier.dart';
 import '../../core/security/device_lock_service.dart';
 import '../../core/security/session_manager.dart';
 import '../../core/security/secure_storage_service.dart';
+import '../../core/theme/app_colors.dart';
 import '../../providers/repository_providers.dart';
 import '../../core/router/app_router.dart';
 
@@ -298,7 +299,7 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
   void _showSettingsModal() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF18191B),
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -332,7 +333,7 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                         ),
                       ],
                     ),
-                    const Divider(color: Color(0xFF2A2D32)),
+                    const Divider(color: Color(0xFF4A2641)),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
@@ -345,8 +346,8 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                         style: TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                       value: _useTrueNorth,
-                      activeTrackColor: const Color(0x66FF4500),
-                      activeThumbColor: const Color(0xFFFF4500),
+                      activeTrackColor: AppColors.mulberryWine,
+                      activeThumbColor: AppColors.roseMauve,
                       onChanged: (val) {
                         setModalState(() => _useTrueNorth = val);
                         setState(() => _useTrueNorth = val);
@@ -509,7 +510,7 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFFFF4500),
+                              color: AppColors.roseMauve,
                             ),
                           ),
                         ] else
@@ -608,7 +609,7 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                                 ),
                               ),
 
-                              // Outer Heading Indicator Notch (Top Orange Pointer at 12 o'clock)
+                              // Outer Heading Indicator Notch (Top Rose Mauve Pointer at 12 o'clock)
                               Positioned(
                                 top: -1.0,
                                 child: Column(
@@ -618,11 +619,11 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                                       width: 36,
                                       height: 3.5,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFFF4500),
+                                        color: AppColors.roseMauve,
                                         borderRadius: BorderRadius.circular(2),
                                         boxShadow: const [
                                           BoxShadow(
-                                            color: Color(0x99FF4500),
+                                            color: AppColors.roseMauveGlow,
                                             blurRadius: 8,
                                           ),
                                         ],
@@ -758,7 +759,7 @@ class _TrianglePointerPainter extends CustomPainter {
       ..close();
 
     final paint = Paint()
-      ..color = const Color(0xFFFF4500)
+      ..color = AppColors.roseMauve
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 

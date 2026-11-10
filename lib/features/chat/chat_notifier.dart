@@ -17,6 +17,8 @@ import '../../domain/models/user.dart';
 import '../../domain/models/reaction.dart';
 import '../../domain/models/typing_indicator.dart';
 import '../../domain/enums.dart';
+import '../../providers/chat_visibility_provider.dart';
+import '../../services/notification_service.dart';
 import 'chat_state.dart';
 import '../../../providers/repository_providers.dart';
 
@@ -239,9 +241,14 @@ class ChatNotifier extends _$ChatNotifier {
           ),
         );
 
-        // If incoming message from partner, acknowledge read
+        // If incoming message from partner:
         if (domainMsg.senderId != userId) {
-          unawaited(markAsRead().catchError((_) {}));
+          final isChatActive = ref.read(isChatActiveProvider);
+          if (!isChatActive) {
+            unawaited(NotificationService.showDecoyNotification().catchError((_) {}));
+          } else {
+            unawaited(markAsRead().catchError((_) {}));
+          }
         }
       } catch (_) {}
     });

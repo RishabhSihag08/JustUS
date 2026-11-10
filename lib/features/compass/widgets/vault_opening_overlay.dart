@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// Vault Opening Loading Screen & Animation
 /// Displays a high-tech mechanical vault opening sequence with smooth rotation,
@@ -144,7 +145,7 @@ class _VaultOpeningOverlayState extends State<VaultOpeningOverlay>
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
-        color: const Color(0xFF0D0E10),
+        color: AppColors.obsidianCharcoal,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -157,8 +158,8 @@ class _VaultOpeningOverlayState extends State<VaultOpeningOverlay>
                     radius: 0.85,
                     colors: [
                       _isUnlocked
-                          ? const Color(0x334A154B) // Slack deep plum glow
-                          : const Color(0x33FF4500), // Orange glow
+                          ? AppColors.mulberryWine.withValues(alpha: 0.35) // Velvet wine glow
+                          : AppColors.roseMauve.withValues(alpha: 0.25),   // Rose Mauve glow
                       Colors.transparent,
                     ],
                   ),
@@ -207,7 +208,7 @@ class _VaultOpeningOverlayState extends State<VaultOpeningOverlay>
                                 ),
                                 border: Border.all(
                                   color: _isUnlocked
-                                      ? const Color(0x66FF4500)
+                                      ? AppColors.roseMauve
                                       : const Color(0x33FFFFFF),
                                   width: 1.5,
                                 ),
@@ -219,7 +220,7 @@ class _VaultOpeningOverlayState extends State<VaultOpeningOverlay>
                                   ),
                                   if (_isUnlocked)
                                     BoxShadow(
-                                      color: const Color(0xFFFF4500).withValues(alpha: 0.25),
+                                      color: AppColors.roseMauve.withValues(alpha: 0.35),
                                       blurRadius: 25,
                                       spreadRadius: 2,
                                     ),
@@ -250,7 +251,7 @@ class _VaultOpeningOverlayState extends State<VaultOpeningOverlay>
                                 key: ValueKey(_isUnlocked),
                                 size: 34,
                                 color: _isUnlocked
-                                    ? const Color(0xFFFF4500)
+                                    ? AppColors.roseMauve
                                     : Colors.white70,
                               ),
                             ),
@@ -285,7 +286,7 @@ class _VaultOpeningOverlayState extends State<VaultOpeningOverlay>
                             fontWeight: FontWeight.w400,
                             letterSpacing: 0.5,
                             color: _isUnlocked
-                                ? const Color(0xFFFFB020)
+                                ? AppColors.roseMauve
                                 : Colors.white60,
                             fontFamily: 'Inter',
                           ),
@@ -311,8 +312,8 @@ class _VaultOpeningOverlayState extends State<VaultOpeningOverlay>
                                   decoration: const BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Color(0xFFFF4500),
-                                        Color(0xFFFF9500),
+                                        AppColors.mulberryWine,
+                                        AppColors.roseMauve,
                                       ],
                                     ),
                                   ),
@@ -383,13 +384,13 @@ class _VaultHandleWheelPainter extends CustomPainter {
     final spokeRadius = size.width / 2 - 8;
 
     final spokePaint = Paint()
-      ..color = isUnlocked ? const Color(0xFFFF4500) : const Color(0x8CFFFFFF)
+      ..color = isUnlocked ? AppColors.roseMauve : const Color(0x8CFFFFFF)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round;
 
     final gripPaint = Paint()
-      ..color = isUnlocked ? const Color(0xFFFF4500) : Colors.white
+      ..color = isUnlocked ? AppColors.roseMauve : Colors.white
       ..style = PaintingStyle.fill;
 
     // 4 Spoke bars (cross arrangement)

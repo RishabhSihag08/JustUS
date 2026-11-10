@@ -82,18 +82,18 @@ class _MessageSearchScreenState extends ConsumerState<MessageSearchScreen> {
     return PopScope(
       canPop: true,
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF1A1D21) : AppColors.softWhite,
+        backgroundColor: isDark ? AppColors.obsidianCharcoal : AppColors.obsidianCharcoal,
         body: SafeArea(
           child: Column(
             children: [
-              // Search App Bar (Slack Aubergine accent)
+              // Search App Bar
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF222529) : Colors.white,
+                  color: isDark ? AppColors.obsidianCharcoal : AppColors.obsidianCharcoal,
                   border: Border(
                     bottom: BorderSide(
-                      color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+                      color: isDark ? const Color(0xFF381F31) : AppColors.borderDark,
                       width: 1,
                     ),
                   ),
@@ -102,17 +102,17 @@ class _MessageSearchScreenState extends ConsumerState<MessageSearchScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      color: isDark ? const Color(0xFFD1D2D3) : AppColors.charcoal,
+                      color: isDark ? AppColors.pureWhite : AppColors.pureWhite,
                       onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1A1D21) : AppColors.purpleHaze,
+                          color: AppColors.surfaceDark,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isDark ? const Color(0xFF35373B) : AppColors.lavenderMist,
+                            color: isDark ? AppColors.borderDark : AppColors.borderDark,
                             width: 1,
                           ),
                         ),
@@ -120,15 +120,15 @@ class _MessageSearchScreenState extends ConsumerState<MessageSearchScreen> {
                           controller: _searchController,
                           focusNode: _focusNode,
                           autofocus: true,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 15,
-                            color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                            color: AppColors.pureWhite,
                           ),
                           decoration: InputDecoration(
                             hintText: 'Search in conversation...',
                             hintStyle: TextStyle(
                               fontSize: 14,
-                              color: isDark ? const Color(0xFF696969) : AppColors.midGray,
+                              color: isDark ? AppColors.mutedMauve : AppColors.mutedMauve,
                             ),
                             prefixIcon: _isSearching
                                 ? const Padding(
@@ -138,14 +138,14 @@ class _MessageSearchScreenState extends ConsumerState<MessageSearchScreen> {
                                       height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: AppColors.aubergine,
+                                        color: AppColors.roseMauve,
                                       ),
                                     ),
                                   )
                                 : Icon(
                                     Icons.search,
                                     size: 20,
-                                    color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                                    color: isDark ? AppColors.roseMauve : AppColors.roseMauve,
                                   ),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
@@ -298,10 +298,10 @@ class _SearchResultTile extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF222529) : Colors.white,
+          color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+            color: isDark ? AppColors.borderDark : AppColors.borderDark,
             width: 1,
           ),
         ),
@@ -314,7 +314,7 @@ class _SearchResultTile extends ConsumerWidget {
                   width: 22,
                   height: 22,
                   decoration: BoxDecoration(
-                    color: isSent ? AppColors.aubergine : const Color(0xFF1264A3),
+                    color: isSent ? AppColors.mulberryWine : AppColors.roseMauve,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Center(
@@ -331,10 +331,10 @@ class _SearchResultTile extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Text(
                   isSent ? 'You' : 'Partner',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                    color: AppColors.pureWhite,
                   ),
                 ),
                 const Spacer(),

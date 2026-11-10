@@ -42,15 +42,16 @@ class AppTheme {
         actionsIconTheme: IconThemeData(color: colorScheme.onSurface),
       ),
 
-      // Card theme - glass panels
+      // Card theme - solid dark panels
       cardTheme: CardThemeData(
-        color: Colors.transparent,
+        color: AppColors.surfaceDark,
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.borderDark, width: 1),
         ),
       ),
 
@@ -190,34 +191,36 @@ class AppTheme {
         ),
       ),
 
-      // Dialog theme - glass modals
+      // Dialog theme - solid opaque dialogs
       dialogTheme: DialogThemeData(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        shadowColor: Colors.transparent,
+        backgroundColor: AppColors.dialogDark,
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.borderDark, width: 1),
         ),
         titleTextStyle: textTheme.titleLarge?.copyWith(
-          color: colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
         ),
         contentTextStyle: textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurfaceVariant,
+          color: AppColors.charcoal,
         ),
       ),
 
-      // Bottom sheet theme - glass modals
+      // Bottom sheet theme
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        shadowColor: Colors.transparent,
+        backgroundColor: AppColors.surfaceDark,
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          side: BorderSide(color: AppColors.borderDark, width: 1),
         ),
-        modalBackgroundColor: Colors.transparent,
+        modalBackgroundColor: AppColors.surfaceDark,
       ),
 
       // Navigation bar theme
@@ -281,28 +284,31 @@ class AppTheme {
         endIndent: 16,
       ),
 
-      // Snack bar theme - glass
+      // Snack bar theme - solid dark surface with border
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: const Color(0xFF2B1626),
+        elevation: 6,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF5A2A4E), width: 1),
         ),
         contentTextStyle: textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurface,
+          color: AppColors.titaniumText,
+          fontWeight: FontWeight.w500,
         ),
-        actionTextColor: colorScheme.primary,
+        actionTextColor: AppColors.roseMauve,
       ),
 
-      // Tooltip theme - glass
+      // Tooltip theme
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
-          color: Colors.transparent,
+          color: const Color(0xFF2B1626),
           borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF5A2A4E), width: 1),
         ),
         textStyle: textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurface,
+          color: AppColors.titaniumText,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         margin: const EdgeInsets.only(bottom: 8),
@@ -383,17 +389,18 @@ class AppTheme {
         ),
       ),
 
-      // Popup menu theme - glass menu
+      // Popup menu theme
       popupMenuTheme: PopupMenuThemeData(
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        elevation: 0,
-        color: Colors.transparent,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
+        elevation: 8,
+        color: const Color(0xFF2B1626),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF5A2A4E), width: 1),
         ),
         labelTextStyle: WidgetStatePropertyAll(textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurface,
+          color: AppColors.titaniumText,
         )),
       ),
 
@@ -451,15 +458,16 @@ class AppTheme {
         actionsIconTheme: IconThemeData(color: colorScheme.onSurface),
       ),
 
-      // Card theme - glass panels
+      // Card theme - solid dark panels
       cardTheme: CardThemeData(
-        color: Colors.transparent,
+        color: AppColors.surfaceDark,
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.borderDark, width: 1),
         ),
       ),
 
@@ -599,34 +607,36 @@ class AppTheme {
         ),
       ),
 
-      // Dialog theme - glass modals
+      // Dialog theme - solid opaque dialogs
       dialogTheme: DialogThemeData(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        shadowColor: Colors.transparent,
+        backgroundColor: AppColors.dialogDark,
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.borderDark, width: 1),
         ),
         titleTextStyle: textTheme.titleLarge?.copyWith(
-          color: colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
         ),
         contentTextStyle: textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurfaceVariant,
+          color: AppColors.charcoal,
         ),
       ),
 
-      // Bottom sheet theme - glass modals
+      // Bottom sheet theme
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        shadowColor: Colors.transparent,
+        backgroundColor: AppColors.surfaceDark,
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          side: BorderSide(color: AppColors.borderDark, width: 1),
         ),
-        modalBackgroundColor: Colors.transparent,
+        modalBackgroundColor: AppColors.surfaceDark,
       ),
 
       // Navigation bar theme
@@ -690,28 +700,31 @@ class AppTheme {
         endIndent: 16,
       ),
 
-      // Snack bar theme - glass
+      // Snack bar theme - solid dark surface with border
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: const Color(0xFF2B1626),
+        elevation: 6,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF5A2A4E), width: 1),
         ),
         contentTextStyle: textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurface,
+          color: AppColors.titaniumText,
+          fontWeight: FontWeight.w500,
         ),
-        actionTextColor: colorScheme.primary,
+        actionTextColor: AppColors.roseMauve,
       ),
 
-      // Tooltip theme - glass
+      // Tooltip theme
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
-          color: Colors.transparent,
+          color: const Color(0xFF2B1626),
           borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF5A2A4E), width: 1),
         ),
         textStyle: textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurface,
+          color: AppColors.titaniumText,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         margin: const EdgeInsets.only(bottom: 8),
@@ -792,17 +805,18 @@ class AppTheme {
         ),
       ),
 
-      // Popup menu theme - glass menu
+      // Popup menu theme
       popupMenuTheme: PopupMenuThemeData(
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        elevation: 0,
-        color: Colors.transparent,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
+        elevation: 8,
+        color: const Color(0xFF2B1626),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF5A2A4E), width: 1),
         ),
         labelTextStyle: WidgetStatePropertyAll(textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurface,
+          color: AppColors.titaniumText,
         )),
       ),
 

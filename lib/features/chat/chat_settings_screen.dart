@@ -95,7 +95,7 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
     return PopScope(
       canPop: true,
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF1A1D21) : AppColors.softWhite,
+        backgroundColor: isDark ? AppColors.obsidianCharcoal : AppColors.obsidianCharcoal,
         body: SafeArea(
           child: Column(
             children: [
@@ -103,10 +103,10 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF222529) : Colors.white,
+                  color: isDark ? AppColors.obsidianCharcoal : AppColors.obsidianCharcoal,
                   border: Border(
                     bottom: BorderSide(
-                      color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+                      color: isDark ? const Color(0xFF381F31) : AppColors.borderDark,
                       width: 1,
                     ),
                   ),
@@ -115,18 +115,18 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      color: isDark ? const Color(0xFFD1D2D3) : AppColors.charcoal,
+                      color: isDark ? AppColors.pureWhite : AppColors.pureWhite,
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
                     const SizedBox(width: 14),
-                    Text(
+                    const Text(
                       'Preferences & Settings',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                        color: AppColors.pureWhite,
                       ),
                     ),
                   ],
@@ -171,11 +171,11 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
       padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+          letterSpacing: 1.0,
+          color: AppColors.neutralGreyMuted,
         ),
       ),
     );
@@ -188,10 +188,10 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222529) : Colors.white,
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+          color: isDark ? AppColors.borderDark : AppColors.borderDark,
           width: 1,
         ),
       ),
@@ -204,12 +204,12 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF35373B) : AppColors.purpleHaze,
+                  color: AppColors.mulberryWine.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.explore_rounded,
-                  color: AppColors.aubergine,
+                  color: AppColors.roseMauve,
                   size: 20,
                 ),
               ),
@@ -223,14 +223,14 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                        color: isDark ? AppColors.pureWhite : AppColors.pureWhite,
                       ),
                     ),
                     Text(
                       'Secret Heading: $headingText  •  PIN: $pinDisplay',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                        color: isDark ? AppColors.mutedMauve : AppColors.mutedMauve,
                       ),
                     ),
                   ],
@@ -242,9 +242,9 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 40),
-              foregroundColor: isDark ? Colors.white : AppColors.aubergine,
-              side: BorderSide(
-                color: isDark ? const Color(0xFF4A154B) : AppColors.aubergine,
+              foregroundColor: AppColors.roseMauve,
+              side: const BorderSide(
+                color: AppColors.roseMauve,
                 width: 1,
               ),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -260,9 +260,9 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 40),
-              foregroundColor: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+              foregroundColor: isDark ? AppColors.titaniumText : AppColors.titaniumText,
               side: BorderSide(
-                color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+                color: isDark ? const Color(0xFF4A2641) : AppColors.borderDark,
                 width: 1,
               ),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -301,7 +301,7 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF1E2124) : Colors.white,
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -538,10 +538,10 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222529) : Colors.white,
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+          color: isDark ? AppColors.borderDark : AppColors.borderDark,
           width: 1,
         ),
       ),
@@ -554,12 +554,12 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF35373B) : AppColors.purpleHaze,
+                  color: AppColors.mulberryWine.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.person_outline_rounded,
-                  color: AppColors.aubergine,
+                  color: AppColors.roseMauve,
                   size: 20,
                 ),
               ),
@@ -570,10 +570,10 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                   children: [
                     Text(
                       roleName,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                        color: AppColors.pureWhite,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -630,19 +630,44 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Text('Log out of $roleName?'),
+          backgroundColor: AppColors.dialogDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppColors.borderDark, width: 1),
+          ),
+          title: Text(
+            'Log out of $roleName?',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.pureWhite,
+            ),
+          ),
           content: const Text(
             'This will unbind this phone from your account and lock the app into compass mode.\n\nNext time, either User 1 or User 2 can log in.\n\nYour chat messages will remain safely stored on this device.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: AppColors.titaniumText,
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: AppColors.neutralGreyMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFE01E5A),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: () async {
                 Navigator.pop(dialogCtx);
@@ -660,10 +685,10 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222529) : Colors.white,
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+          color: isDark ? AppColors.borderDark : AppColors.borderDark,
           width: 1,
         ),
       ),
@@ -676,12 +701,12 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF35373B) : AppColors.purpleHaze,
+                  color: AppColors.mulberryWine.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.timer_outlined,
-                  color: AppColors.aubergine,
+                  color: AppColors.roseMauve,
                   size: 20,
                 ),
               ),
@@ -690,19 +715,19 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Auto-delete timer',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                        color: AppColors.pureWhite,
                       ),
                     ),
                     Text(
                       'New messages expire after selected time',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                        color: isDark ? AppColors.mutedMauve : AppColors.mutedMauve,
                       ),
                     ),
                   ],
@@ -731,13 +756,13 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: isSelected
-                ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
+                ? AppColors.mulberryWine
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isSelected
-                  ? (isDark ? const Color(0xFF730394) : AppColors.lavenderMist)
-                  : (isDark ? const Color(0xFF35373B) : AppColors.fog),
+                  ? AppColors.roseMauve
+                  : AppColors.borderDark,
               width: 1,
             ),
           ),
@@ -750,15 +775,15 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     color: isSelected
-                        ? (isDark ? Colors.white : AppColors.aubergine)
-                        : (isDark ? const Color(0xFFD1D2D3) : AppColors.carbon),
+                        ? Colors.white
+                        : (isDark ? AppColors.titaniumText : AppColors.titaniumText),
                   ),
                 ),
               ),
               if (isSelected)
                 const Icon(
                   Icons.check_circle_rounded,
-                  color: AppColors.aubergine,
+                  color: AppColors.roseMauve,
                   size: 20,
                 ),
             ],
@@ -811,10 +836,10 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222529) : Colors.white,
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+          color: isDark ? AppColors.borderDark : AppColors.borderDark,
           width: 1,
         ),
       ),
@@ -830,12 +855,12 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF35373B) : AppColors.purpleHaze,
+                    color: AppColors.mulberryWine.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
                     Icons.download_rounded,
-                    color: AppColors.aubergine,
+                    color: AppColors.roseMauve,
                     size: 20,
                   ),
                 ),
@@ -844,19 +869,19 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Export Encrypted Backup',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                          color: AppColors.pureWhite,
                         ),
                       ),
                       Text(
                         'Save a password-protected local backup file',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                          color: isDark ? AppColors.mutedMauve : AppColors.mutedMauve,
                         ),
                       ),
                     ],
@@ -868,19 +893,19 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppColors.aubergine,
+                      color: AppColors.roseMauve,
                     ),
                   )
                 else
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                    color: isDark ? AppColors.mutedMauve : AppColors.mutedMauve,
                   ),
               ],
             ),
           ),
           Divider(
-            color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+            color: isDark ? const Color(0xFF4A2641) : AppColors.borderDark,
             height: 24,
           ),
 
@@ -894,12 +919,12 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF35373B) : AppColors.purpleHaze,
+                    color: AppColors.mulberryWine.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
                     Icons.upload_rounded,
-                    color: AppColors.aubergine,
+                    color: AppColors.roseMauve,
                     size: 20,
                   ),
                 ),
@@ -908,19 +933,19 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Restore Encrypted Backup',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                          color: AppColors.pureWhite,
                         ),
                       ),
                       Text(
                         'Import messages from a previously saved backup',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                          color: isDark ? AppColors.mutedMauve : AppColors.mutedMauve,
                         ),
                       ),
                     ],
@@ -932,13 +957,13 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppColors.aubergine,
+                      color: AppColors.roseMauve,
                     ),
                   )
                 else
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                    color: isDark ? AppColors.mutedMauve : AppColors.mutedMauve,
                   ),
               ],
             ),
@@ -1027,10 +1052,10 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222529) : Colors.white,
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFE01E5A).withValues(alpha: 0.3),
+          color: const Color(0xFFE01E5A).withValues(alpha: 0.35),
           width: 1,
         ),
       ),
@@ -1091,19 +1116,44 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Master Delete Chat History?'),
+          backgroundColor: AppColors.dialogDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppColors.borderDark, width: 1),
+          ),
+          title: const Text(
+            'Master Delete Chat History?',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.pureWhite,
+            ),
+          ),
           content: const Text(
             'This will permanently delete ALL messages, voice notes, media files, and reactions from both phones and the cloud database.\n\nThis action is irreversible.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: AppColors.titaniumText,
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: AppColors.neutralGreyMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFE01E5A),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: () async {
                 Navigator.pop(dialogCtx);

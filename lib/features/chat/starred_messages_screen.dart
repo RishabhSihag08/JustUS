@@ -24,7 +24,7 @@ class _StarredMessagesScreenState extends ConsumerState<StarredMessagesScreen> {
     return PopScope(
       canPop: true,
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF1A1D21) : AppColors.softWhite,
+        backgroundColor: isDark ? AppColors.obsidianCharcoal : AppColors.obsidianCharcoal,
         body: SafeArea(
           child: Column(
             children: [
@@ -32,10 +32,10 @@ class _StarredMessagesScreenState extends ConsumerState<StarredMessagesScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF222529) : Colors.white,
+                  color: isDark ? AppColors.obsidianCharcoal : AppColors.obsidianCharcoal,
                   border: Border(
                     bottom: BorderSide(
-                      color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+                      color: isDark ? const Color(0xFF381F31) : AppColors.borderDark,
                       width: 1,
                     ),
                   ),
@@ -44,7 +44,7 @@ class _StarredMessagesScreenState extends ConsumerState<StarredMessagesScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      color: isDark ? const Color(0xFFD1D2D3) : AppColors.charcoal,
+                      color: isDark ? AppColors.pureWhite : AppColors.pureWhite,
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -52,16 +52,16 @@ class _StarredMessagesScreenState extends ConsumerState<StarredMessagesScreen> {
                     const SizedBox(width: 12),
                     const Icon(
                       Icons.star_rounded,
-                      color: Color(0xFFECB22E),
+                      color: AppColors.roseMauve,
                       size: 22,
                     ),
                     const SizedBox(width: 8),
-                    Text(
+                    const Text(
                       'Starred Messages',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                        color: AppColors.pureWhite,
                       ),
                     ),
                   ],
@@ -188,10 +188,10 @@ class _StarredMessageTile extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF222529) : Colors.white,
+          color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+            color: AppColors.borderDark,
             width: 1,
           ),
         ),
@@ -201,7 +201,7 @@ class _StarredMessageTile extends ConsumerWidget {
             const Icon(
               Icons.star_rounded,
               size: 20,
-              color: Color(0xFFECB22E),
+              color: AppColors.roseMauve,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -212,10 +212,10 @@ class _StarredMessageTile extends ConsumerWidget {
                     children: [
                       Text(
                         isSent ? 'You' : 'Partner',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                          color: AppColors.pureWhite,
                         ),
                       ),
                       const Spacer(),
@@ -223,7 +223,7 @@ class _StarredMessageTile extends ConsumerWidget {
                         _formatTime(message.createdAt),
                         style: TextStyle(
                           fontSize: 11,
-                          color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                          color: isDark ? AppColors.mutedMauve : AppColors.mutedMauve,
                         ),
                       ),
                     ],

@@ -23,7 +23,7 @@ class DeliveryStatusIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final defaultTickColor = isDark ? const Color(0xFF8696A0) : AppColors.midGray;
+    final defaultTickColor = isDark ? AppColors.mutedMauve : AppColors.mutedMauve;
 
     switch (status) {
       case 'pending':
@@ -53,18 +53,15 @@ class DeliveryStatusIcon extends StatelessWidget {
           ),
         );
       case 'read':
-        return color != null
-            ? SvgPicture.asset(
-                'assets/icons/read.svg',
-                width: size,
-                height: size,
-                colorFilter: ColorFilter.mode(color!, BlendMode.srcIn),
-              )
-            : SvgPicture.asset(
-                'assets/icons/read.svg',
-                width: size,
-                height: size,
-              );
+        return SvgPicture.asset(
+          'assets/icons/read.svg',
+          width: size,
+          height: size,
+          colorFilter: ColorFilter.mode(
+            color ?? AppColors.roseMauve,
+            BlendMode.srcIn,
+          ),
+        );
       default:
         return SvgPicture.asset(
           'assets/icons/sent.svg',

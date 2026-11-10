@@ -121,12 +121,18 @@ class _SwipeToReplyState extends State<SwipeToReply>
                       height: 34,
                       decoration: BoxDecoration(
                         color: _dragOffset >= _threshold
-                            ? AppColors.aubergine
-                            : (isDark ? const Color(0xFF2E3136) : const Color(0xFFE8E5EC)),
+                            ? AppColors.mulberryWine
+                            : (isDark ? AppColors.toneOfDarkGrey : const Color(0xFFE8E5EC)),
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _dragOffset >= _threshold
+                              ? AppColors.roseMauve
+                              : Colors.transparent,
+                          width: 1,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
+                            color: Colors.black.withValues(alpha: 0.25),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -136,8 +142,8 @@ class _SwipeToReplyState extends State<SwipeToReply>
                         Icons.reply_rounded,
                         size: 20,
                         color: _dragOffset >= _threshold
-                            ? Colors.white
-                            : (isDark ? Colors.white70 : AppColors.carbon),
+                            ? AppColors.roseMauve
+                            : (isDark ? AppColors.titaniumText : AppColors.carbon),
                       ),
                     ),
                   ),

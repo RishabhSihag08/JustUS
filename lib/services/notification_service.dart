@@ -36,6 +36,10 @@ class DecoyNotificationHelper {
 
 /// Service for handling push notifications and stealth decoy local notifications
 class NotificationService {
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
@@ -72,6 +76,8 @@ class NotificationService {
         channelName,
         description: channelDescription,
         importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
       );
       await androidImplementation.createNotificationChannel(channel);
       await androidImplementation.requestNotificationsPermission();
@@ -135,9 +141,12 @@ class NotificationService {
       channelDescription: channelDescription,
       importance: Importance.high,
       priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+      channelShowBadge: true,
       showWhen: true,
       icon: '@mipmap/ic_launcher',
-      category: AndroidNotificationCategory.status,
+      category: AndroidNotificationCategory.message,
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -167,13 +176,14 @@ class NotificationService {
   /// triggers a stealth decoy compass notification.
   void startListeningForIncomingMessages({
     required SupabaseClient supabase,
-    required String boundUserId,
+    String? boundUserId,
     required bool Function() isChatActive,
     void Function(Map<String, dynamic> record)? onMessageReceived,
   }) {
     stopListeningForIncomingMessages();
 
-    final channelName = 'decoy-incoming-$boundUserId';
+    final channelName = 'decoy-incoming-${boundUserId ?? "all"}';
+    debugPrint('Starting decoy notification listener on channel: $channelName (boundUser: $boundUserId)');
     _incomingMessageChannel = supabase
         .channel(channelName)
         .onPostgresChanges(
@@ -185,8 +195,12 @@ class NotificationService {
               final record = payload.newRecord;
               final senderId = record['sender_id'] as String?;
 
-              // Only notify if sent by the partner (not ourselves)
-              if (senderId != null && senderId != boundUserId) {
+              // Only notify if sent by partner (not ourselves)
+              final isFromPartner = boundUserId != null
+                  ? (senderId != null && senderId != boundUserId)
+                  : true;
+
+              if (isFromPartner) {
                 // If caller provided callback to persist to Drift, invoke it
                 onMessageReceived?.call(record);
 
@@ -200,7 +214,9 @@ class NotificationService {
             }
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          debugPrint('Decoy incoming channel status: $status, error: $error');
+        });
   }
 
   /// Stop listening for incoming messages

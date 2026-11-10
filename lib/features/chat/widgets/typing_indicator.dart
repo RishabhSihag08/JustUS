@@ -165,19 +165,22 @@ class _TypingIndicatorState extends State<TypingIndicator>
                   width: 58,
                   height: 42,
                   decoration: BoxDecoration(
-                    // Vibrant electric blue from reference GIF
-                    color: const Color(0xFF29A5F7),
+                    color: AppColors.surfaceDark,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(18),
                       topRight: Radius.circular(18),
                       bottomRight: Radius.circular(18),
                       bottomLeft: Radius.circular(4),
                     ),
-                    boxShadow: [
+                    border: Border.all(
+                      color: AppColors.roseMauve.withValues(alpha: 0.55),
+                      width: 1.2,
+                    ),
+                    boxShadow: const [
                       BoxShadow(
-                        color: const Color(0xFF29A5F7).withValues(alpha: 0.35),
+                        color: AppColors.roseMauveGlow,
                         blurRadius: 8,
-                        offset: const Offset(0, 3),
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
@@ -200,7 +203,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
                                 width: 6.5,
                                 height: 6.5,
                                 decoration: const BoxDecoration(
-                                  color: Colors.white,
+                                  color: AppColors.roseMauve,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -226,7 +229,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
                     color: widget.isDark
-                        ? const Color(0xFFABABAD)
+                        ? AppColors.mutedMauve
                         : AppColors.charcoal,
                     fontWeight: FontWeight.w400,
                   ),

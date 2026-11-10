@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// Custom Painter for the Rotating Compass Dial Face
 /// Replicates the high-precision vector dial from references/compass screen reference/code.html
@@ -49,12 +50,12 @@ class CompassDialPainter extends CustomPainter {
         strokeWidth = 1.0 * scale;
       }
 
-      // Highlight North zone (348° to 12°) in orange
+      // Highlight North zone (348° to 12°) in Rose Mauve
       if (deg >= 348 || deg <= 12) {
         if (deg == 0) {
-          strokeColor = const Color(0xFFFF4500); // Full accent orange
+          strokeColor = AppColors.roseMauve; // Full accent Rose Mauve
         } else {
-          strokeColor = const Color(0xB3FF4500); // 70% accent orange
+          strokeColor = AppColors.roseMauve.withValues(alpha: 0.7); // 70% accent
         }
       }
 
@@ -82,7 +83,7 @@ class CompassDialPainter extends CustomPainter {
       final textSpan = TextSpan(
         text: deg.toString(),
         style: TextStyle(
-          color: deg == 0 ? const Color(0xFFFF4500) : const Color(0xFFD1D1D6),
+          color: deg == 0 ? AppColors.roseMauve : AppColors.titaniumText,
           fontSize: 11.5 * scale,
           fontWeight: FontWeight.w600,
           fontFamily: 'Inter',
@@ -102,12 +103,12 @@ class CompassDialPainter extends CustomPainter {
     }
 
     // 4. Cardinal Direction Labels
-    // North (N) - Large Accent Orange
+    // North (N) - Large Accent Rose Mauve
     final northPainter = TextPainter(
       text: TextSpan(
         text: 'N',
         style: TextStyle(
-          color: const Color(0xFFFF4500),
+          color: AppColors.roseMauve,
           fontSize: 21.0 * scale,
           fontWeight: FontWeight.w700,
           fontFamily: 'Inter',
@@ -130,7 +131,7 @@ class CompassDialPainter extends CustomPainter {
       ..close();
 
     final trianglePaint = Paint()
-      ..color = const Color(0xFFFF4500)
+      ..color = AppColors.roseMauve
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
@@ -203,7 +204,7 @@ class CompassDialPainter extends CustomPainter {
       final ry = cy + (radiusOuter - 2) * sin(refRad);
 
       final pipPaint = Paint()
-        ..color = const Color(0xFFFF4500)
+        ..color = AppColors.roseMauve
         ..style = PaintingStyle.fill;
       canvas.drawCircle(Offset(rx, ry), 3.5 * scale, pipPaint);
     }
@@ -223,7 +224,7 @@ class CompassDialPainter extends CustomPainter {
       final sweepAngleRad = diff * (pi / 180);
 
       final arcPaint = Paint()
-        ..color = const Color(0x4DFF4500) // subtle translucent orange
+        ..color = AppColors.roseMauveGlow
         ..style = PaintingStyle.stroke
         ..strokeWidth = 6.0 * scale
         ..strokeCap = StrokeCap.round

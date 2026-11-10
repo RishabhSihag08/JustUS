@@ -69,17 +69,17 @@ class SessionManager extends Notifier<SessionState> {
 
   /// Setup persistent stealth decoy notification listener for the bound user
   Future<void> _setupDecoyNotificationListener([String? explicitUserId]) async {
-    final boundUserId = explicitUserId ?? await SecureStorageService.readBoundUserId();
-    if (boundUserId != null) {
-      try {
-        ref.read(notificationServiceProvider).startListeningForIncomingMessages(
-          supabase: Supabase.instance.client,
-          boundUserId: boundUserId,
-          isChatActive: () => ref.read(isChatActiveProvider),
-        );
-      } catch (e) {
-        debugPrint('setupDecoyNotificationListener note: $e');
-      }
+    final boundUserId = explicitUserId ??
+        await SecureStorageService.readBoundUserId() ??
+        await SecureStorageService.readSessionUserId();
+    try {
+      ref.read(notificationServiceProvider).startListeningForIncomingMessages(
+        supabase: Supabase.instance.client,
+        boundUserId: boundUserId,
+        isChatActive: () => ref.read(isChatActiveProvider),
+      );
+    } catch (e) {
+      debugPrint('setupDecoyNotificationListener note: $e');
     }
   }
 
@@ -179,6 +179,17 @@ class SessionManager extends Notifier<SessionState> {
       // Start stealth decoy notification listener for this user
       unawaited(_setupDecoyNotificationListener(user.id));
 
+      // Register FCM token if available
+      try {
+        final token = await ref.read(notificationServiceProvider).getToken();
+        if (token != null) {
+          final deviceId = await SecureStorageService.readDeviceId() ?? user.id;
+          await repository.updateFcmToken(user.id, token, deviceId);
+        }
+      } catch (e) {
+        debugPrint('FCM token registration note: $e');
+      }
+
       // Navigate to chat (handled by router redirect)
     } else {
       // Invalid PIN - handle attempt count
@@ -241,11 +252,14 @@ class SessionManager extends Notifier<SessionState> {
     // Clear session state to require PIN re-entry
     _updateState(const SessionLocked());
 
-    // Unsubscribe from all Realtime channels while locked
+    // Unsubscribe from conversation Realtime channels while locked
     ref.read(realtimeServiceProvider).unsubscribeAll();
 
-    // Cancel WorkManager immediate task
-    ref.read(workmanagerServiceProvider).cancelImmediateSync();
+    // Ensure the decoy notification listener remains actively listening
+    unawaited(_setupDecoyNotificationListener());
+
+    // Schedule background sync
+    ref.read(workmanagerServiceProvider).scheduleImmediateSync();
 
     // Router will redirect to /pin via redirect callback
   }

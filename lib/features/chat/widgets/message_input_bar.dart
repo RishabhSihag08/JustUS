@@ -224,7 +224,7 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
   void _showAttachmentModal(BuildContext context, bool isDark) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF222529) : Colors.white,
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -243,19 +243,19 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF454245) : AppColors.fog,
+                        color: isDark ? const Color(0xFF4A2641) : AppColors.borderLight,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           'Share Content',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                            color: AppColors.pureWhite,
                           ),
                         ),
                         // View Once Toggle Pill
@@ -271,13 +271,13 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
                               color: isViewOnce
-                                  ? (isDark ? const Color(0xFF611F69) : AppColors.aubergine)
-                                  : (isDark ? const Color(0xFF2E3136) : const Color(0xFFF0EDF2)),
+                                  ? AppColors.mulberryWine
+                                  : const Color(0xFF2B1626),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: isViewOnce
-                                    ? AppColors.aubergine
-                                    : (isDark ? const Color(0xFF454245) : AppColors.fog),
+                                    ? AppColors.roseMauve
+                                    : const Color(0xFF4A2641),
                                 width: 1.5,
                               ),
                             ),
@@ -288,8 +288,8 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
                                   isViewOnce ? Icons.lock_clock_rounded : Icons.lock_clock_outlined,
                                   size: 16,
                                   color: isViewOnce
-                                      ? Colors.white
-                                      : (isDark ? const Color(0xFFABABAD) : AppColors.charcoal),
+                                      ? AppColors.roseMauve
+                                      : (isDark ? AppColors.mutedMauve : AppColors.charcoal),
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
@@ -299,7 +299,7 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
                                     fontWeight: FontWeight.w700,
                                     color: isViewOnce
                                         ? Colors.white
-                                        : (isDark ? const Color(0xFFABABAD) : AppColors.charcoal),
+                                        : (isDark ? AppColors.mutedMauve : AppColors.charcoal),
                                   ),
                                 ),
                               ],
@@ -427,8 +427,8 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
     final hasText = _textController.text.trim().isNotEmpty;
 
     return Container(
-      color: isDark ? const Color(0xFF1A1D21) : AppColors.softWhite,
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+      color: Colors.transparent, // Floating over chat canvas without top/bottom bars
+      padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -441,7 +441,7 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
                 : const SizedBox.shrink(),
           ),
 
-          // Main input container
+          // Main floating row (Pill on left + Circular Action Button on right)
           _isRecording
               ? _buildRecordingBar(isDark)
               : _buildStandardInputBar(isDark, hasText),
@@ -452,17 +452,27 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
 
   Widget _buildReplyingBar(bool isDark) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.only(bottom: 8, left: 4, right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222529) : AppColors.purpleHaze,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(color: AppColors.aubergine, width: 3),
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.borderDark,
+          width: 1,
         ),
       ),
       child: Row(
         children: [
+          Container(
+            width: 3,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.mulberryWine,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -473,16 +483,16 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.aubergine,
+                    color: AppColors.roseMauve,
                   ),
                 ),
                 Text(
                   widget.replyingTo!.content ?? 'Attachment',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
-                    color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                    color: AppColors.titaniumText,
                   ),
                 ),
               ],
@@ -493,7 +503,7 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
             onPressed: widget.onCancelReply,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
-            color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+            color: AppColors.neutralGreyMuted,
           ),
         ],
       ),
@@ -506,173 +516,258 @@ class _MessageInputBarState extends ConsumerState<MessageInputBar>
     final seconds =
         _recordingDuration.inSeconds.remainder(60).toString().padLeft(2, '0');
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222529) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFE01E5A).withValues(alpha: 0.5),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE01E5A)
-                      .withValues(alpha: _pulseAnimation.value),
-                  shape: BoxShape.circle,
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 10),
-          Text(
-            '$minutes:$seconds',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFE01E5A),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            'Recording voice note...',
-            style: TextStyle(
-              fontSize: 13,
-              color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
-            ),
-          ),
-          const Spacer(),
-          // Cancel
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded),
-            color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
-            tooltip: 'Cancel',
-            onPressed: _cancelRecording,
-          ),
-          const SizedBox(width: 4),
-          // Send
-          InkWell(
-            onTap: _stopAndSendRecording,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: AppColors.aubergine,
-                shape: BoxShape.circle,
+    return Row(
+      children: [
+        // Left Recording Pill
+        Expanded(
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 50),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.toneOfBlack,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: AppColors.borderDark,
+                width: 1,
               ),
-              child: const Icon(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE01E5A)
+                            .withValues(alpha: _pulseAnimation.value),
+                        shape: BoxShape.circle,
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '$minutes:$seconds',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.pureWhite,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Recording audio...',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.neutralGreyMuted,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  color: AppColors.neutralGreyMuted,
+                  tooltip: 'Cancel',
+                  onPressed: _cancelRecording,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        // Right Circular Send FAB
+        InkWell(
+          onTap: _stopAndSendRecording,
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.actionFab,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.actionFab.withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Icon(
                 Icons.arrow_upward_rounded,
                 color: Colors.white,
-                size: 20,
+                size: 24,
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildStandardInputBar(bool isDark, bool hasText) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222529) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF35373B) : AppColors.fog,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Attachment Button (+)
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded, size: 24),
-            color: isDark ? const Color(0xFFABABAD) : AppColors.charcoal,
-            onPressed: () => _showAttachmentModal(context, isDark),
-            tooltip: 'Attach file',
-            padding: const EdgeInsets.all(10),
-            constraints: const BoxConstraints(),
-          ),
-
-          // Message Input Field
-          Expanded(
-            child: TextField(
-              controller: _textController,
-              focusNode: _focusNode,
-              maxLines: 5,
-              minLines: 1,
-              textCapitalization: TextCapitalization.sentences,
-              onChanged: _onTextChanged,
-              style: TextStyle(
-                fontSize: 15,
-                color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // 1 & 2: Left Pill Container (Add Button + Text Field + Attachments)
+        Expanded(
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 50),
+            decoration: BoxDecoration(
+              color: AppColors.toneOfBlack, // Tone of black (#181818)
+              borderRadius: BorderRadius.circular(28), // Pill shape
+              border: Border.all(
+                color: AppColors.borderDark,
+                width: 1,
               ),
-              decoration: InputDecoration(
-                hintText: 'Send a message...',
-                hintStyle: TextStyle(
-                  fontSize: 15,
-                  color: isDark ? const Color(0xFF696969) : AppColors.midGray,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                isCollapsed: true,
-              ),
+              ],
             ),
-          ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // (1) The Add Button (+)
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline_rounded, size: 24),
+                  color: AppColors.neutralGreyMuted,
+                  onPressed: () => _showAttachmentModal(context, isDark),
+                  tooltip: 'Add attachment',
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  constraints: const BoxConstraints(),
+                ),
 
-          // Mic or Send Button
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            transitionBuilder: (child, animation) {
-              return ScaleTransition(
-                scale: animation,
-                child: FadeTransition(opacity: animation, child: child),
-              );
-            },
-            child: hasText
-                ? Padding(
-                    key: const ValueKey('send_btn'),
-                    padding: const EdgeInsets.only(right: 6, bottom: 6),
-                    child: InkWell(
-                      onTap: _handleSendText,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: AppColors.aubergine,
-                          borderRadius: BorderRadius.circular(8),
+                // (2) The Text Field
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: TextField(
+                      controller: _textController,
+                      focusNode: _focusNode,
+                      maxLines: 5,
+                      minLines: 1,
+                      textCapitalization: TextCapitalization.sentences,
+                      onChanged: _onTextChanged,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.pureWhite,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: 'Enter message',
+                        hintStyle: TextStyle(
+                          fontSize: 15,
+                          color: AppColors.neutralGreyMuted,
                         ),
-                        child: const Icon(
-                          Icons.arrow_upward_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        isCollapsed: true,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                       ),
                     ),
-                  )
-                : IconButton(
-                    key: const ValueKey('mic_btn'),
-                    icon: const Icon(Icons.mic_none_rounded, size: 24),
-                    color: isDark ? const Color(0xFFABABAD) : AppColors.charcoal,
-                    onPressed: _startRecording,
-                    tooltip: 'Record voice note',
-                    padding: const EdgeInsets.all(10),
-                    constraints: const BoxConstraints(),
                   ),
+                ),
+
+                // Attachment Paperclip Quick-Access
+                IconButton(
+                  icon: const Icon(Icons.attach_file_rounded, size: 22),
+                  color: AppColors.neutralGreyMuted,
+                  onPressed: () => _showAttachmentModal(context, isDark),
+                  tooltip: 'Attach media',
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        ),
+
+        const SizedBox(width: 8),
+
+        // (3) Standalone Circular Floating Action Button (Mic / Send)
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          transitionBuilder: (child, animation) {
+            return ScaleTransition(
+              scale: animation,
+              child: FadeTransition(opacity: animation, child: child),
+            );
+          },
+          child: hasText
+              ? InkWell(
+                  key: const ValueKey('send_fab_btn'),
+                  onTap: _handleSendText,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.actionFab, // Mulberry Wine (#6E1C53)
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.actionFab.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.arrow_upward_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                )
+              : InkWell(
+                  key: const ValueKey('mic_fab_btn'),
+                  onTap: _startRecording,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.actionFab, // Mulberry Wine (#6E1C53)
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.actionFab.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.mic_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

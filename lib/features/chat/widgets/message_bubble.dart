@@ -9,6 +9,7 @@ import '../../../domain/models/reaction.dart';
 import '../../../domain/enums.dart';
 import 'delivery_status_icon.dart';
 import 'voice_note_player.dart';
+import 'enlarged_media_viewer.dart';
 
 /// Message Bubble - WhatsApp-blended reactions & SVG read receipts
 class MessageBubble extends ConsumerWidget {
@@ -22,6 +23,9 @@ class MessageBubble extends ConsumerWidget {
   final VoidCallback? onLongPress;
   final Message? repliedMessage;
   final String? otherUserName;
+  final VoidCallback? onMediaTap;
+  final VoidCallback? onReplyPreviewTap;
+  final bool isHighlighted;
 
   const MessageBubble({
     super.key,
@@ -35,6 +39,9 @@ class MessageBubble extends ConsumerWidget {
     this.onLongPress,
     this.repliedMessage,
     this.otherUserName,
+    this.onMediaTap,
+    this.onReplyPreviewTap,
+    this.isHighlighted = false,
   });
 
   @override
@@ -61,7 +68,9 @@ class MessageBubble extends ConsumerWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onLongPress: onLongPress,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.78,
             minWidth: hasReactions ? 75 : 0,
@@ -71,6 +80,18 @@ class MessageBubble extends ConsumerWidget {
             left: isSent ? 48 : 12,
             right: isSent ? 12 : 48,
           ),
+          decoration: isHighlighted
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.roseMauve.withValues(alpha: 0.85),
+                      blurRadius: 18,
+                      spreadRadius: 2.5,
+                    ),
+                  ],
+                )
+              : null,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -126,43 +147,58 @@ class MessageBubble extends ConsumerWidget {
       replyText = replyData['text'] as String? ?? '';
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isDark
-            ? (isSent ? const Color(0xFF280E2E) : const Color(0xFF1E2125))
-            : (isSent ? const Color(0xFFEEDDFF) : const Color(0xFFEFEBF1)),
-        borderRadius: BorderRadius.circular(6),
-        border: Border(
-          left: BorderSide(
-            color: isSent ? AppColors.aubergine : AppColors.channelBlue,
-            width: 3,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onReplyPreviewTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark
+              ? (isSent ? AppColors.mulberryWine.withValues(alpha: 0.35) : const Color(0xFF2B1626))
+              : (isSent ? const Color(0xFF4A1A3D) : const Color(0xFF2B1626)),
+          borderRadius: BorderRadius.circular(6),
+          border: Border(
+            left: BorderSide(
+              color: isSent ? AppColors.roseMauve : AppColors.roseMauve,
+              width: 3,
+            ),
           ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            senderName,
-            style: TextStyle(
-              color: isSent ? AppColors.aubergine : AppColors.channelBlue,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  senderName,
+                  style: TextStyle(
+                    color: isSent ? AppColors.roseMauve : AppColors.roseMauve,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.subdirectory_arrow_right_rounded,
+                  size: 11,
+                  color: (isSent ? AppColors.roseMauve : AppColors.roseMauve).withValues(alpha: 0.7),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            replyText,
-            style: TextStyle(
-              color: isDark ? Colors.white70 : AppColors.charcoal,
-              fontSize: 12,
+            const SizedBox(height: 1),
+            Text(
+              replyText,
+              style: TextStyle(
+                color: isDark ? AppColors.titaniumText : AppColors.charcoal,
+                fontSize: 12,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -191,7 +227,7 @@ class MessageBubble extends ConsumerWidget {
         return _buildTextBubble(theme, colorScheme, text, time, status, isStarred, isDark);
       case 'image':
       case 'video':
-        return _buildMediaBubble(type, text, mediaUrl, isViewOnce, isViewOnceViewed, time, status, isStarred, colorScheme, isDark);
+        return _buildMediaBubble(context, type, text, mediaUrl, isViewOnce, isViewOnceViewed, time, status, isStarred, colorScheme, isDark);
       case 'voice':
         return _buildVoiceBubble(mediaUrl, mediaDuration, time, status, isStarred, isDark);
       default:
@@ -220,13 +256,11 @@ class MessageBubble extends ConsumerWidget {
     bool isStarred,
     bool isDark,
   ) {
-    final bgColor = isSent
-        ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
-        : (isDark ? const Color(0xFF222529) : Colors.white);
-    final borderColor = isSent
-        ? (isDark ? const Color(0xFF611F69) : AppColors.lavenderMist)
-        : (isDark ? const Color(0xFF35373B) : AppColors.fog);
-    final textColor = isDark ? Colors.white : AppColors.carbon;
+    final bgColor = isSent ? AppColors.sentBubble : AppColors.receivedBubble;
+    final borderColor = isHighlighted
+        ? AppColors.roseMauve
+        : (isSent ? AppColors.roseMauve.withValues(alpha: 0.35) : AppColors.borderDark);
+    final borderWidth = isHighlighted ? 2.0 : 1.0;
 
     final hasReply = repliedMessage != null || message?['replyTo'] != null;
 
@@ -239,7 +273,7 @@ class MessageBubble extends ConsumerWidget {
         Text(
           text,
           style: TextStyle(
-            color: textColor,
+            color: isSent ? AppColors.pureWhite : AppColors.titaniumText,
             fontSize: 15,
             height: 1.35,
             fontWeight: FontWeight.w400,
@@ -259,7 +293,7 @@ class MessageBubble extends ConsumerWidget {
           bottomLeft: Radius.circular(isSent ? 12 : 2),
           bottomRight: Radius.circular(isSent ? 2 : 12),
         ),
-        border: Border.all(color: borderColor, width: 1),
+        border: Border.all(color: borderColor, width: borderWidth),
       ),
       child: hasReply
           ? IntrinsicWidth(
@@ -278,6 +312,7 @@ class MessageBubble extends ConsumerWidget {
   }
 
   Widget _buildMediaBubble(
+    BuildContext context,
     String type,
     String text,
     String? mediaUrl,
@@ -289,12 +324,11 @@ class MessageBubble extends ConsumerWidget {
     ColorScheme colorScheme,
     bool isDark,
   ) {
-    final bgColor = isSent
-        ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
-        : (isDark ? const Color(0xFF222529) : Colors.white);
-    final borderColor = isSent
-        ? (isDark ? const Color(0xFF611F69) : AppColors.lavenderMist)
-        : (isDark ? const Color(0xFF35373B) : AppColors.fog);
+    final bgColor = isSent ? AppColors.sentBubble : AppColors.receivedBubble;
+    final borderColor = isHighlighted
+        ? AppColors.roseMauve
+        : (isSent ? AppColors.roseMauve.withValues(alpha: 0.35) : AppColors.borderDark);
+    final borderWidth = isHighlighted ? 2.0 : 1.0;
 
     Widget mediaWidget;
     if (mediaUrl != null && File(mediaUrl).existsSync()) {
@@ -316,18 +350,38 @@ class MessageBubble extends ConsumerWidget {
       mediaWidget = _buildPlaceholderMedia(type, colorScheme);
     }
 
+    final messageId = domainMessage?.id ?? (message?['id'] as String? ?? 'media');
+
     return Container(
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 1),
+        border: Border.all(color: borderColor, width: borderWidth),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            mediaWidget,
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onMediaTap ?? () {
+                if (mediaUrl != null && mediaUrl.isNotEmpty) {
+                  EnlargedMediaViewer.open(
+                    context,
+                    mediaUrl: mediaUrl,
+                    caption: text.isNotEmpty ? text : null,
+                    senderName: isSent ? 'You' : (otherUserName ?? 'Partner'),
+                    timestamp: domainMessage?.createdAt,
+                    heroTag: 'media_$messageId',
+                  );
+                }
+              },
+              child: Hero(
+                tag: 'media_$messageId',
+                child: mediaWidget,
+              ),
+            ),
             if (text.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 2),
@@ -375,19 +429,18 @@ class MessageBubble extends ConsumerWidget {
     bool isStarred,
     bool isDark,
   ) {
-    final bgColor = isSent
-        ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
-        : (isDark ? const Color(0xFF222529) : Colors.white);
-    final borderColor = isSent
-        ? (isDark ? const Color(0xFF611F69) : AppColors.lavenderMist)
-        : (isDark ? const Color(0xFF35373B) : AppColors.fog);
+    final bgColor = isSent ? AppColors.sentBubble : AppColors.receivedBubble;
+    final borderColor = isHighlighted
+        ? AppColors.roseMauve
+        : (isSent ? AppColors.roseMauve.withValues(alpha: 0.35) : AppColors.borderDark);
+    final borderWidth = isHighlighted ? 2.0 : 1.0;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1),
+        border: Border.all(color: borderColor, width: borderWidth),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -414,12 +467,11 @@ class MessageBubble extends ConsumerWidget {
     bool isStarred,
     bool isDark,
   ) {
-    final bgColor = isSent
-        ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
-        : (isDark ? const Color(0xFF222529) : Colors.white);
-    final borderColor = isSent
-        ? (isDark ? const Color(0xFF611F69) : AppColors.lavenderMist)
-        : (isDark ? const Color(0xFF35373B) : AppColors.fog);
+    final bgColor = isSent ? AppColors.sentBubble : AppColors.receivedBubble;
+    final borderColor = isHighlighted
+        ? AppColors.roseMauve
+        : (isSent ? AppColors.roseMauve.withValues(alpha: 0.35) : AppColors.borderDark);
+    final borderWidth = isHighlighted ? 2.0 : 1.0;
 
     return Material(
       color: Colors.transparent,
@@ -445,7 +497,7 @@ class MessageBubble extends ConsumerWidget {
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor, width: 1),
+            border: Border.all(color: borderColor, width: borderWidth),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -541,11 +593,9 @@ class MessageBubble extends ConsumerWidget {
     final firstEmoji = grouped.keys.first;
 
     // Background matches bubble color, border matches chat background for the cutout look
-    final badgeBg = isSent
-        ? (isDark ? const Color(0xFF381440) : AppColors.purpleHaze)
-        : (isDark ? const Color(0xFF222529) : Colors.white);
+    final badgeBg = isSent ? AppColors.sentBubble : AppColors.receivedBubble;
 
-    final cutoutBorderColor = isDark ? const Color(0xFF1A1D21) : AppColors.softWhite;
+    final cutoutBorderColor = isDark ? AppColors.obsidianVoid : AppColors.obsidianVoid;
 
     return GestureDetector(
       onTap: () => onReactionTap?.call(firstEmoji),

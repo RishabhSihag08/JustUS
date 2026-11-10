@@ -20,8 +20,6 @@ class PresenceHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final chatState = ref.watch(chatNotifierProvider);
 
     final otherUser = chatState.otherUser;
@@ -34,20 +32,20 @@ class PresenceHeader extends ConsumerWidget {
     final isTyping = typingIndicator?.isTyping ?? false;
     final isRecording = typingIndicator?.isRecording ?? false;
 
-    // Header background: Slack Deep Plum for branding
+    // Header background: Obsidian Charcoal with Velvet Plum border
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1D21) : AppColors.deepPlum,
-        border: Border(
+        color: AppColors.obsidianVoid,
+        border: const Border(
           bottom: BorderSide(
-            color: isDark ? const Color(0xFF35373B) : AppColors.plumShadow,
+            color: AppColors.borderDark,
             width: 1,
           ),
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1A000000),
+            color: Color(0x26000000),
             offset: Offset(0, 2),
             blurRadius: 6,
           ),
@@ -55,23 +53,26 @@ class PresenceHeader extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // Slack channel # or avatar
+          // Sleek stealth avatar
           Stack(
             children: [
               Container(
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: AppColors.aubergine,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.lavenderMist.withValues(alpha: 0.3)),
+                  color: AppColors.toneOfDarkGrey,
+                  borderRadius: BorderRadius.circular(19),
+                  border: Border.all(
+                    color: AppColors.borderDark,
+                    width: 1.5,
+                  ),
                 ),
                 child: Center(
                   child: Text(
-                    partnerName.isNotEmpty ? partnerName[0].toUpperCase() : '#',
+                    partnerName.isNotEmpty ? partnerName[0].toUpperCase() : 'U',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
+                      color: AppColors.pureWhite,
+                      fontSize: 17,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -80,17 +81,32 @@ class PresenceHeader extends ConsumerWidget {
               Positioned(
                 right: 0,
                 bottom: 0,
-                child: Container(
-                  width: 11,
-                  height: 11,
-                  decoration: BoxDecoration(
-                    color: isOnline ? AppColors.success : AppColors.midGray,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF1A1D21) : AppColors.deepPlum,
-                      width: 2,
-                    ),
-                  ),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.7, end: 1.0),
+                  duration: const Duration(milliseconds: 1200),
+                  builder: (context, val, child) {
+                    return Container(
+                      width: 11,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: isOnline ? AppColors.roseMauve : AppColors.mutedMauve,
+                        shape: BoxShape.circle,
+                        boxShadow: isOnline
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.roseMauve.withValues(alpha: 0.5 * val),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ]
+                            : null,
+                        border: Border.all(
+                          color: AppColors.obsidianVoid,
+                          width: 2,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -110,7 +126,7 @@ class PresenceHeader extends ConsumerWidget {
                       child: Text(
                         partnerName,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.pureWhite,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.2,
@@ -123,13 +139,17 @@ class PresenceHeader extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
+                        color: AppColors.roseMauve.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: AppColors.roseMauve.withValues(alpha: 0.3),
+                          width: 0.8,
+                        ),
                       ),
                       child: const Text(
-                        'direct',
+                        'secure',
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: AppColors.roseMauve,
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
@@ -140,9 +160,9 @@ class PresenceHeader extends ConsumerWidget {
                 const SizedBox(height: 2),
                 if (isTyping)
                   const Text(
-                    'typing...',
+                    'transmitting...',
                     style: TextStyle(
-                      color: AppColors.lavenderMist,
+                      color: AppColors.roseMauve,
                       fontSize: 12,
                       fontStyle: FontStyle.italic,
                     ),
@@ -151,7 +171,7 @@ class PresenceHeader extends ConsumerWidget {
                   const Text(
                     'recording audio...',
                     style: TextStyle(
-                      color: AppColors.warning,
+                      color: AppColors.roseMauve,
                       fontSize: 12,
                     ),
                   )
@@ -159,7 +179,7 @@ class PresenceHeader extends ConsumerWidget {
                   Text(
                     isOnline ? 'Active now' : 'Away',
                     style: TextStyle(
-                      color: isOnline ? AppColors.success : Colors.white60,
+                      color: isOnline ? AppColors.roseMauve : AppColors.mutedMauve,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
