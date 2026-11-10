@@ -12,6 +12,17 @@ import '../../features/chat/chat_settings_screen.dart';
 import '../../features/chat/widgets/view_once_viewer.dart';
 import '../../core/security/session_manager.dart';
 
+/// Notifier & Provider to track when the vault opening animation is active
+class VaultOpeningNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setOpening(bool value) => state = value;
+}
+
+final isVaultOpeningProvider =
+    NotifierProvider<VaultOpeningNotifier, bool>(VaultOpeningNotifier.new);
+
 /// GoRouter provider
 final appRouterProvider = Provider<GoRouter>((ref) {
   final sessionManager = ref.watch(sessionManagerProvider.notifier);
@@ -25,6 +36,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isDecoyRoute = state.matchedLocation == '/compass';
       final isPinRoute = state.matchedLocation == '/pin';
       final isViewOnceRoute = state.matchedLocation.startsWith('/view-once');
+      final isVaultOpening = ref.watch(isVaultOpeningProvider);
 
       // Allow view-once viewer without PIN if logged in (it has its own security)
       if (isViewOnceRoute) {
@@ -34,6 +46,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // If not logged in and not on decoy route, redirect to decoy compass
       if (!isLoggedIn && !isDecoyRoute) {
         return '/compass';
+      }
+
+      // If logged in but the vault opening animation is still in progress, allow it to finish
+      if (isLoggedIn && isVaultOpening) {
+        return null;
       }
 
       // If logged in and on decoy or pin route, redirect to chat
@@ -71,9 +88,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'chat',
         pageBuilder: (context, state) => CustomTransitionPage<void>(
           key: state.pageKey,
+          transitionDuration: const Duration(milliseconds: 400),
           child: const ChatScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
+                child: child,
+              ),
+            );
           },
         ),
       ),

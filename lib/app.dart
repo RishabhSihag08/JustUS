@@ -21,7 +21,7 @@ class JustUsApp extends ConsumerWidget {
     });
 
     return MaterialApp.router(
-      title: 'JustUS',
+      title: 'Compass',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

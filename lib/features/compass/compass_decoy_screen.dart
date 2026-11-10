@@ -8,8 +8,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
 
 import 'widgets/compass_dial_painter.dart';
+import 'widgets/vault_opening_overlay.dart';
 import '../pin_pad/pin_pad_notifier.dart';
 import '../../core/security/session_manager.dart';
+import '../../core/router/app_router.dart';
 
 /// Compass Decoy Screen
 /// A fully functional, realistic compass interface acting as a decoy lock screen.
@@ -34,6 +36,11 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
   bool _hasSensorData = false;
   bool _isManualDragging = false;
   bool _isAuthenticating = false;
+  bool _isInSecretZone = false;
+
+  // Vault opening animation state
+  bool _showVaultOverlay = false;
+  Future<void>? _authFuture;
 
   // Manual touch rotation variables
   double _panStartTouchAngle = 0.0;
@@ -95,6 +102,7 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
 
   void _onSensorHeadingUpdated(double targetHeading) {
     _heading = targetHeading;
+    _checkSecretAngleHaptic(targetHeading);
 
     // Shortest angular path interpolation
     final delta = _shortestAngleDelta(_displayHeading, targetHeading);
@@ -102,6 +110,22 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
     _animTargetHeading = _displayHeading + delta;
 
     _smoothController.forward(from: 0.0);
+  }
+
+  /// Subtle tactile tumbler feedback when rotating into the secret heading range
+  void _checkSecretAngleHaptic(double heading) {
+    final user1Heading = double.tryParse(dotenv.env['USER_1_HEADING'] ?? '') ?? 120.0;
+    final user2Heading = double.tryParse(dotenv.env['USER_2_HEADING'] ?? '') ?? 260.0;
+    const tolerance = 4.0;
+
+    final inZone = _isHeadingMatching(heading, user1Heading, tolerance) ||
+        _isHeadingMatching(heading, user2Heading, tolerance);
+
+    if (inZone && !_isInSecretZone) {
+      // Gentle mechanical tumbler click
+      HapticFeedback.selectionClick();
+    }
+    _isInSecretZone = inZone;
   }
 
   double _shortestAngleDelta(double from, double to) {
@@ -124,6 +148,8 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
 
   /// Handle center reticle tap: Check for secret heading trigger or toggle reference bearing
   Future<void> _handleCenterTap() async {
+    if (_showVaultOverlay || _isAuthenticating) return;
+
     final current = _normalizeHeading(_heading);
 
     // Read secret headings and PINs from environment
@@ -135,11 +161,13 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
     final user2Pin = dotenv.env['USER_2_PIN'] ?? '5678';
 
     if (_isHeadingMatching(current, user1Heading, tolerance)) {
-      // Secret Trigger: User 1
-      await _authenticateUser(user1Pin);
+      // Secret Trigger: User 1 - Strong haptic confirmation & launch Vault Opening
+      HapticFeedback.heavyImpact();
+      _startVaultOpening(user1Pin);
     } else if (_isHeadingMatching(current, user2Heading, tolerance)) {
-      // Secret Trigger: User 2
-      await _authenticateUser(user2Pin);
+      // Secret Trigger: User 2 - Strong haptic confirmation & launch Vault Opening
+      HapticFeedback.heavyImpact();
+      _startVaultOpening(user2Pin);
     } else {
       // Innocent decoy action: Toggle reference bearing (standard Apple / Android Compass behavior)
       _toggleReferenceBearing();
@@ -157,27 +185,28 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
     return diff <= tolerance;
   }
 
-  /// Headless auth trigger: programmatically submit the stored PIN
-  Future<void> _authenticateUser(String pin) async {
-    if (_isAuthenticating) return;
+  /// Launch Vault Opening loading sequence and headless authentication
+  void _startVaultOpening(String pin) {
     _isAuthenticating = true;
 
-    try {
-      // Programmatically invoke existing PIN verification logic
-      await ref.read(pinPadNotifierProvider.notifier).submitPin(pin);
+    // Signal router that vault opening animation is in progress
+    ref.read(isVaultOpeningProvider.notifier).setOpening(true);
 
-      if (mounted) {
-        final sessionState = ref.read(sessionManagerProvider);
-        if (sessionState is SessionAuthenticated) {
-          context.go('/chat');
-        }
-      }
-    } catch (e) {
-      debugPrint('Compass auth note: $e');
-    } finally {
-      if (mounted) {
-        _isAuthenticating = false;
-      }
+    // Start background PIN verification immediately
+    _authFuture = ref.read(pinPadNotifierProvider.notifier).submitPin(pin);
+
+    setState(() {
+      _showVaultOverlay = true;
+    });
+  }
+
+  /// Invoked when Vault Opening sequence finishes and is ready to reveal chat
+  void _onVaultOpeningComplete() {
+    _isAuthenticating = false;
+    ref.read(isVaultOpeningProvider.notifier).setOpening(false);
+
+    if (mounted) {
+      context.go('/chat');
     }
   }
 
@@ -299,15 +328,26 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
     final dialSize = min(338.0, screenWidth - 48.0);
     final activeHeading = _isManualDragging ? _heading : _displayHeading;
 
+    // Reset overlay if session gets locked
+    ref.listen<SessionState>(sessionManagerProvider, (previous, next) {
+      if (next is SessionLocked && mounted && _showVaultOverlay) {
+        setState(() {
+          _showVaultOverlay = false;
+        });
+      }
+    });
+
     return PopScope(
       canPop: false,
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Top Bar with Minimalist Settings Button
+        body: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Top Bar with Minimalist Settings Button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
@@ -520,6 +560,8 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                                 final deltaAngleDeg = (currentAngle - _panStartTouchAngle) * 180 / pi;
                                 final newHeading = _normalizeHeading(_headingAtPanStart - deltaAngleDeg);
 
+                                _checkSecretAngleHaptic(newHeading);
+
                                 setState(() {
                                   _heading = newHeading;
                                   _displayHeading = newHeading;
@@ -556,8 +598,19 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
             ],
           ),
         ),
-      ),
-    );
+
+        // Fullscreen Vault Opening Loading Animation & Transition Screen
+        if (_showVaultOverlay)
+          Positioned.fill(
+            child: VaultOpeningOverlay(
+              authFuture: _authFuture ?? Future.value(),
+              onTransitionReady: _onVaultOpeningComplete,
+            ),
+          ),
+      ],
+    ),
+  ),
+);
   }
 
   String _getBearingDiffText(double heading, double ref) {
