@@ -1,83 +1,143 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Service for handling push notifications and local notifications
+/// Helper providing realistic compass calibration and navigation alerts
+class DecoyNotificationHelper {
+  static const List<String> decoyBodies = [
+    'Your compass needs to be calibrated to work.',
+    'Open and check which direction you are heading.',
+    'Compass sensor orientation check required.',
+    'Magnetic field interference detected. Rotate phone in figure 8.',
+    'Heading accuracy degraded. Tap to recalibrate.',
+    'Magnetic declination adjustment recommended for true heading.',
+    'Sensor orientation check recommended.',
+    'Check your current heading alignment.',
+  ];
+
+  static const List<String> decoyTitles = [
+    'Compass',
+    'Compass Calibration',
+    'Orientation Sensor',
+    'Compass Heading',
+  ];
+
+  static (String title, String body) getRandomDecoy() {
+    final rand = Random();
+    final title = decoyTitles[rand.nextInt(decoyTitles.length)];
+    final body = decoyBodies[rand.nextInt(decoyBodies.length)];
+    return (title, body);
+  }
+}
+
+/// Service for handling push notifications and stealth decoy local notifications
 class NotificationService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+
+  static const String channelId = 'compass_alerts';
+  static const String channelName = 'Compass Calibration';
+  static const String channelDescription = 'Compass sensor and navigation calibration alerts';
+
+  static void Function()? onNavigateToCompass;
+  RealtimeChannel? _incomingMessageChannel;
 
   /// Initialize notification service
   Future<void> initialize() async {
-    // Request permissions
-    await _requestPermissions();
-
-    // Initialize local notifications
+    // 1. Initialize local notifications
     const initializationSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       iOS: DarwinInitializationSettings(),
     );
 
-    await _localNotifications.initialize(initializationSettings);
+    await _localNotifications.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (response) {
+        debugPrint('Decoy notification clicked: ${response.payload}');
+        // Strictly navigate to /compass, preserving complete decoy cover
+        onNavigateToCompass?.call();
+      },
+    );
 
-    // Set up foreground message handler
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-
-    // Set up background message handler
-    FirebaseMessaging.onBackgroundMessage(_handleBackgroundMessage);
-
-    // Set up notification tap handler
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
-
-    // Get and store FCM token
-    final token = await _firebaseMessaging.getToken();
-    if (token != null) {
-      // Token will be sent to server via repository
-      debugPrint('FCM Token: $token');
+    // 2. Create Android notification channel
+    final androidImplementation = _localNotifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImplementation != null) {
+      const channel = AndroidNotificationChannel(
+        channelId,
+        channelName,
+        description: channelDescription,
+        importance: Importance.high,
+      );
+      await androidImplementation.createNotificationChannel(channel);
+      await androidImplementation.requestNotificationsPermission();
     }
+
+    // 3. Request Firebase Messaging permissions
+    await _requestPermissions();
+
+    // 4. Set up FCM handlers
+    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    FirebaseMessaging.onBackgroundMessage(_handleBackgroundMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      debugPrint('FCM opened app: ${message.data}');
+      onNavigateToCompass?.call();
+    });
+
+    // 5. Check initial message if app opened via notification
+    try {
+      final initialMessage = await _firebaseMessaging.getInitialMessage();
+      if (initialMessage != null) {
+        onNavigateToCompass?.call();
+      }
+    } catch (_) {}
   }
 
   /// Request notification permissions
   Future<void> _requestPermissions() async {
-    final settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-
-    debugPrint('Notification permission: ${settings.authorizationStatus}');
+    try {
+      final settings = await _firebaseMessaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+      debugPrint('Notification permission: ${settings.authorizationStatus}');
+    } catch (e) {
+      debugPrint('Notification permission request note: $e');
+    }
   }
 
-  /// Handle foreground messages
+  /// Handle incoming foreground FCM messages
   void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('Foreground message: ${message.messageId}');
-    _showLocalNotification(message);
+    debugPrint('Foreground FCM message: ${message.messageId}');
+    showDecoyNotification();
   }
 
-  /// Handle background messages (must be top-level function)
+  /// Handle background FCM messages (top-level handler)
+  @pragma('vm:entry-point')
   static Future<void> _handleBackgroundMessage(RemoteMessage message) async {
-    debugPrint('Background message: ${message.messageId}');
-    // In background, you might want to store the message locally
-    // and show a local notification
+    debugPrint('Background FCM message: ${message.messageId}');
+    await showDecoyNotification();
   }
 
-  /// Handle notification tap
-  void _handleNotificationTap(RemoteMessage message) {
-    debugPrint('Notification tapped: ${message.data}');
-    // Navigate to chat screen - handled by router
-  }
+  /// Show a stealth decoy compass notification
+  static Future<void> showDecoyNotification() async {
+    final (title, body) = DecoyNotificationHelper.getRandomDecoy();
 
-  /// Show local notification
-  Future<void> _showLocalNotification(RemoteMessage message) async {
     const androidDetails = AndroidNotificationDetails(
-      'justus_messages',
-      'Messages',
-      channelDescription: 'New message notifications',
+      channelId,
+      channelName,
+      channelDescription: channelDescription,
       importance: Importance.high,
       priority: Priority.high,
       showWhen: true,
+      icon: '@mipmap/ic_launcher',
+      category: AndroidNotificationCategory.status,
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -91,33 +151,78 @@ class NotificationService {
       iOS: iosDetails,
     );
 
+    final notificationId = Random().nextInt(100000);
+
     await _localNotifications.show(
-      message.messageId?.hashCode ?? 0,
-      message.notification?.title ?? 'New Message',
-      message.notification?.body ?? 'You have a new message',
+      notificationId,
+      title,
+      body,
       details,
-      payload: message.data['message_id'],
+      payload: 'decoy_compass',
     );
   }
 
-  /// Subscribe to topic
-  Future<void> subscribeToTopic(String topic) async {
-    await _firebaseMessaging.subscribeToTopic(topic);
+  /// Start listening for incoming messages on Supabase Realtime for a bound user.
+  /// When a message from the partner arrives while the user is not actively on the chat screen,
+  /// triggers a stealth decoy compass notification.
+  void startListeningForIncomingMessages({
+    required SupabaseClient supabase,
+    required String boundUserId,
+    required bool Function() isChatActive,
+    void Function(Map<String, dynamic> record)? onMessageReceived,
+  }) {
+    stopListeningForIncomingMessages();
+
+    final channelName = 'decoy-incoming-$boundUserId';
+    _incomingMessageChannel = supabase
+        .channel(channelName)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          callback: (payload) async {
+            try {
+              final record = payload.newRecord;
+              final senderId = record['sender_id'] as String?;
+
+              // Only notify if sent by the partner (not ourselves)
+              if (senderId != null && senderId != boundUserId) {
+                // If caller provided callback to persist to Drift, invoke it
+                onMessageReceived?.call(record);
+
+                // If user is not actively chatting on the chat screen, show decoy alert
+                if (!isChatActive()) {
+                  await showDecoyNotification();
+                }
+              }
+            } catch (e) {
+              debugPrint('Incoming message listener note: $e');
+            }
+          },
+        )
+        .subscribe();
   }
 
-  /// Unsubscribe from topic
-  Future<void> unsubscribeFromTopic(String topic) async {
-    await _firebaseMessaging.unsubscribeFromTopic(topic);
+  /// Stop listening for incoming messages
+  void stopListeningForIncomingMessages() {
+    _incomingMessageChannel?.unsubscribe();
+    _incomingMessageChannel = null;
   }
 
   /// Get FCM token
   Future<String?> getToken() async {
-    return await _firebaseMessaging.getToken();
+    try {
+      return await _firebaseMessaging.getToken();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Delete FCM token
   Future<void> deleteToken() async {
-    await _firebaseMessaging.deleteToken();
+    try {
+      await _firebaseMessaging.deleteToken();
+    } catch (_) {}
   }
 }
 

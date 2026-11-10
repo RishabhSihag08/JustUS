@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/security/secure_storage_service.dart';
 import 'firebase_options.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,14 @@ Future<void> main() async {
     await SecureStorageService.initialize();
   } catch (e) {
     debugPrint('SecureStorageService note: $e');
+  }
+
+  // Initialize stealth decoy notification service
+  try {
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+  } catch (e) {
+    debugPrint('NotificationService note: $e');
   }
 
   runApp(

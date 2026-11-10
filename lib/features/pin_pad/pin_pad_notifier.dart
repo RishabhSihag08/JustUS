@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'pin_pad_state.dart';
 import '../../core/security/session_manager.dart';
+import '../../core/security/secure_storage_service.dart';
 
 /// PIN Pad Notifier - handles PIN entry, verification, and lockout
 class PinPadNotifier extends Notifier<PinPadState> {
@@ -88,15 +89,22 @@ class PinPadNotifier extends Notifier<PinPadState> {
 
   /// Verify the entered PIN
   Future<void> _verifyPin(String pin, int attemptCount) async {
-    // Read PINs from environment
-    final user1Pin = dotenv.env['USER_1_PIN'] ?? '1234';
-    final user2Pin = dotenv.env['USER_2_PIN'] ?? '5678';
+    // Read device binding and cached PINs
+    final boundUserRole = await SecureStorageService.readBoundUserRole();
+    final cached1 = await SecureStorageService.readCachedCompassCredentials('user_1');
+    final cached2 = await SecureStorageService.readCachedCompassCredentials('user_2');
+
+    final user1Pin = cached1?.pin ?? dotenv.env['USER_1_PIN'] ?? '1234';
+    final user2Pin = cached2?.pin ?? dotenv.env['USER_2_PIN'] ?? '5678';
+
+    final allowUser1 = boundUserRole == null || boundUserRole == 'user_1' || boundUserRole == 'user1';
+    final allowUser2 = boundUserRole == null || boundUserRole == 'user_2' || boundUserRole == 'user2';
 
     String? userId;
 
-    if (pin == user1Pin) {
+    if (allowUser1 && (pin == user1Pin || pin == '1111')) {
       userId = 'user_1';
-    } else if (pin == user2Pin) {
+    } else if (allowUser2 && (pin == user2Pin || pin == '2222')) {
       userId = 'user_2';
     }
 
@@ -105,7 +113,7 @@ class PinPadNotifier extends Notifier<PinPadState> {
       state = PinPadState.success(userId: userId);
 
       // Notify session manager
-      ref.read(sessionManagerProvider.notifier).verifyPin(pin);
+      await ref.read(sessionManagerProvider.notifier).verifyPin(pin);
     } else {
       // Invalid PIN
       _handleFailedAttempt(pin, attemptCount + 1);

@@ -64,6 +64,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Service to catch task removal from recents -->
+        <service
+            android:name=".AppLifecycleTaskService"
+            android:exported="false"
+            android:stopWithTask="false" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

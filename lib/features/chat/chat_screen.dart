@@ -3,14 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/security/device_lock_service.dart';
 import '../../core/security/session_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/models/message.dart';
+import '../../providers/chat_visibility_provider.dart';
 import 'chat_notifier.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/message_input_bar.dart';
 import 'widgets/presence_header.dart';
 import 'widgets/swipe_to_reply.dart';
+import 'widgets/typing_indicator.dart';
 
 /// Chat Screen - Clean Slack-inspired 1-on-1 private chat
 class ChatScreen extends ConsumerStatefulWidget {
@@ -30,6 +33,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(chatNotifierProvider.notifier).markAsRead();
       ref.read(chatNotifierProvider.notifier).setPresence(true);
+      ref.read(isChatActiveProvider.notifier).setActive(true);
     });
   }
 
@@ -38,10 +42,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     if (state == AppLifecycleState.resumed) {
       ref.read(chatNotifierProvider.notifier).setPresence(true);
       ref.read(chatNotifierProvider.notifier).markAsRead();
+      ref.read(isChatActiveProvider.notifier).setActive(true);
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
       ref.read(chatNotifierProvider.notifier).setPresence(false);
+      ref.read(isChatActiveProvider.notifier).setActive(false);
     }
   }
 
@@ -49,6 +55,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     ref.read(chatNotifierProvider.notifier).setPresence(false);
+    ref.read(isChatActiveProvider.notifier).setActive(false);
     _scrollController.dispose();
     super.dispose();
   }
@@ -216,14 +223,151 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    subtitle: const Text(
+                      'This action cannot be undone',
+                      style: TextStyle(
+                        color: Color(0xFFE01E5A),
+                        fontSize: 12,
+                      ),
+                    ),
                     onTap: () {
                       Navigator.pop(sheetContext);
-                      notifier.deleteForEveryone(message.id);
+                      _showDeleteForEveryoneConfirmation(
+                        context,
+                        message,
+                        notifier,
+                        isDark,
+                      );
                     },
                   ),
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showDeleteForEveryoneConfirmation(
+    BuildContext context,
+    Message message,
+    ChatNotifier notifier,
+    bool isDark,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF222529) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE01E5A).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_forever_rounded,
+                  color: Color(0xFFE01E5A),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Delete for everyone?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : AppColors.carbon,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This message will be permanently deleted for both you and your partner.',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                  color: isDark ? const Color(0xFFD1D2D3) : AppColors.charcoal,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE01E5A).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFE01E5A).withValues(alpha: 0.25),
+                  ),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFE01E5A),
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This action cannot be undone.',
+                        style: TextStyle(
+                          color: Color(0xFFE01E5A),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE01E5A),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                notifier.deleteForEveryone(message.id);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Message deleted for everyone'),
+                    duration: Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              child: const Text(
+                'Delete for everyone',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -248,6 +392,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
 
     return PopScope(
       canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        DeviceLockService.moveTaskToBack();
+      },
       child: Scaffold(
         backgroundColor: isDark ? const Color(0xFF1A1D21) : AppColors.softWhite,
         body: SafeArea(
@@ -306,10 +454,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                       ),
               ),
 
-              // Typing indicator
-              if (chatState.typingIndicator != null &&
-                  chatState.typingIndicator!.isTyping)
-                _buildTypingIndicator(otherUserName, isDark),
+              // Animated Typing Indicator matching reference GIF
+              TypingIndicator(
+                isVisible: chatState.typingIndicator != null &&
+                    (chatState.typingIndicator!.isTyping ||
+                        chatState.typingIndicator!.isRecording),
+                partnerName: otherUserName,
+                isRecording: chatState.typingIndicator?.isRecording ?? false,
+                isDark: isDark,
+              ),
 
               // Message Input Bar
               MessageInputBar(
@@ -394,19 +547,5 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _buildTypingIndicator(String partnerName, bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      alignment: Alignment.centerLeft,
-      child: Text(
-        '$partnerName is typing...',
-        style: TextStyle(
-          fontSize: 12,
-          fontStyle: FontStyle.italic,
-          color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
-        ),
-      ),
-    );
-  }
+
 }

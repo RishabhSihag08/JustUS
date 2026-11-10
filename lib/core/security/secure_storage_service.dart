@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../domain/models/compass_credentials.dart';
 
 /// Secure Storage Service - wraps FlutterSecureStorage for type-safe operations
 class SecureStorageService {
@@ -18,6 +19,12 @@ class SecureStorageService {
   static const String _lastSyncAtKey = 'last_sync_at';
   static const String _deviceIdKey = 'device_id';
   static const String _pinHashKey = 'pin_hash';
+  static const String _boundUserRoleKey = 'bound_user_role';
+  static const String _boundUserIdKey = 'bound_user_id';
+  static const String _user1HeadingKey = 'user_1_heading';
+  static const String _user1PinKey = 'user_1_pin';
+  static const String _user2HeadingKey = 'user_2_heading';
+  static const String _user2PinKey = 'user_2_pin';
 
   /// Initialize the secure storage
   static Future<void> initialize() async {
@@ -119,6 +126,93 @@ class SecureStorageService {
       debugPrint('SecureStorageService readPinHash error: $e');
       return null;
     }
+  }
+
+  /// Save bound user to this device (locks login to this user role)
+  static Future<void> saveBoundUser({
+    required String userId,
+    required String userRole,
+  }) async {
+    try {
+      await _storage.write(key: _boundUserRoleKey, value: userRole);
+      await _storage.write(key: _boundUserIdKey, value: userId);
+    } catch (e) {
+      debugPrint('SecureStorageService saveBoundUser error: $e');
+    }
+  }
+
+  /// Read the bound user role ('user_1' or 'user_2', or null if unbound)
+  static Future<String?> readBoundUserRole() async {
+    try {
+      return await _storage.read(key: _boundUserRoleKey);
+    } catch (e) {
+      debugPrint('SecureStorageService readBoundUserRole error: $e');
+      return null;
+    }
+  }
+
+  /// Read the bound user ID
+  static Future<String?> readBoundUserId() async {
+    try {
+      return await _storage.read(key: _boundUserIdKey);
+    } catch (e) {
+      debugPrint('SecureStorageService readBoundUserId error: $e');
+      return null;
+    }
+  }
+
+  /// Clear the device binding (unbounds the phone, allowing either user to log in)
+  static Future<void> clearBoundUser() async {
+    try {
+      await _storage.delete(key: _boundUserRoleKey);
+      await _storage.delete(key: _boundUserIdKey);
+    } catch (e) {
+      debugPrint('SecureStorageService clearBoundUser error: $e');
+    }
+  }
+
+  /// Cache compass credentials locally for fast/offline access
+  static Future<void> cacheCompassCredentials({
+    required String role,
+    required double heading,
+    required String pin,
+    String? userId,
+  }) async {
+    try {
+      final isUser1 = role == 'user_1' || role == 'user1';
+      final headingKey = isUser1 ? _user1HeadingKey : _user2HeadingKey;
+      final pinKey = isUser1 ? _user1PinKey : _user2PinKey;
+
+      await _storage.write(key: headingKey, value: heading.toString());
+      await _storage.write(key: pinKey, value: pin);
+    } catch (e) {
+      debugPrint('SecureStorageService cacheCompassCredentials error: $e');
+    }
+  }
+
+  /// Read cached compass credentials for a specific role
+  static Future<CompassCredentials?> readCachedCompassCredentials(String role) async {
+    try {
+      final isUser1 = role == 'user_1' || role == 'user1';
+      final headingKey = isUser1 ? _user1HeadingKey : _user2HeadingKey;
+      final pinKey = isUser1 ? _user1PinKey : _user2PinKey;
+
+      final headingStr = await _storage.read(key: headingKey);
+      final pin = await _storage.read(key: pinKey);
+
+      if (headingStr != null && pin != null) {
+        final heading = double.tryParse(headingStr) ?? (isUser1 ? 120.0 : 260.0);
+        return CompassCredentials(
+          userId: isUser1 ? 'd3cba4e7-7772-4f57-aa75-27237b515374' : '3d5db18d-4908-4f04-a5ae-de4b2afd6cf0',
+          role: isUser1 ? 'user_1' : 'user_2',
+          heading: heading,
+          pin: pin,
+        );
+      }
+    } catch (e) {
+      debugPrint('SecureStorageService readCachedCompassCredentials error: $e');
+    }
+    return null;
   }
 
   /// Clear all data (for logout/reset)

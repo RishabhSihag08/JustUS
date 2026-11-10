@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'device_lock_service.dart';
 import 'secure_storage_service.dart';
+import '../../providers/chat_visibility_provider.dart';
 import '../../providers/repository_providers.dart';
+import '../../providers/service_providers.dart';
 
 /// Session state sealed class
 sealed class SessionState {
@@ -59,7 +63,24 @@ class SessionManager extends Notifier<SessionState> {
     ref.onDispose(_dispose);
     // Start with locked state
     _setupAppLifecycleListener();
+    _setupDecoyNotificationListener();
     return const SessionLocked();
+  }
+
+  /// Setup persistent stealth decoy notification listener for the bound user
+  Future<void> _setupDecoyNotificationListener([String? explicitUserId]) async {
+    final boundUserId = explicitUserId ?? await SecureStorageService.readBoundUserId();
+    if (boundUserId != null) {
+      try {
+        ref.read(notificationServiceProvider).startListeningForIncomingMessages(
+          supabase: Supabase.instance.client,
+          boundUserId: boundUserId,
+          isChatActive: () => ref.read(isChatActiveProvider),
+        );
+      } catch (e) {
+        debugPrint('setupDecoyNotificationListener note: $e');
+      }
+    }
   }
 
   /// Update state and notify stream
@@ -68,8 +89,12 @@ class SessionManager extends Notifier<SessionState> {
     _streamController.add(newState);
   }
 
-  /// Setup app lifecycle listener for auto-lock
+  /// Setup app lifecycle listener and native device lock detection
   void _setupAppLifecycleListener() {
+    DeviceLockService.initialize(
+      onDeviceLocked: () => _lockIfAuthenticated(),
+    );
+
     AppLifecycleListener(
       onInactive: () => _onAppInactive(),
       onHide: () => _onAppHidden(),
@@ -79,22 +104,23 @@ class SessionManager extends Notifier<SessionState> {
     );
   }
 
-  /// Called when app becomes inactive (e.g. app switcher / recents opened)
+  /// Called when app becomes inactive (e.g. app switcher / notification shade opened)
   void _onAppInactive() {
-    _immediateLockIfAuthenticated();
+    // Intentionally preserved: do not lock when merely switching apps or previewing
   }
 
-  /// Called when app goes to background/hidden
+  /// Called when app goes to background/hidden (e.g. minimized to home screen)
   void _onAppHidden() {
-    _immediateLockIfAuthenticated();
+    // Intentionally preserved: do not lock when going to home screen
   }
 
-  /// Called when app is paused (Android) or resigns active (iOS)
+  /// Called when app is paused
   void _onAppPaused() {
-    _immediateLockIfAuthenticated();
+    // Check if the pause occurred because the phone is locking / screen turned off
+    unawaited(_checkDeviceLock());
   }
 
-  /// Called when app is detached
+  /// Called when app is detached (task removed from recents / process terminated)
   void _onAppDetached() {
     lock();
   }
@@ -102,10 +128,20 @@ class SessionManager extends Notifier<SessionState> {
   /// Called when app comes to foreground
   void _onAppResumed() {
     _cancelAutoLock();
+    // Verify if the phone was locked or screen turned off while in background
+    unawaited(_checkDeviceLock());
   }
 
-  /// Immediately lock the session if authenticated to shield from recents switcher
-  void _immediateLockIfAuthenticated() {
+  /// Check if native layer reported a device lock / screen off event
+  Future<void> _checkDeviceLock() async {
+    final wasLocked = await DeviceLockService.checkAndResetDeviceLocked();
+    if (wasLocked) {
+      _lockIfAuthenticated();
+    }
+  }
+
+  /// Lock the session if currently authenticated
+  void _lockIfAuthenticated() {
     _cancelAutoLock();
     if (state is SessionAuthenticated) {
       lock();
@@ -124,8 +160,12 @@ class SessionManager extends Notifier<SessionState> {
     final user = await repository.verifyPin(pin);
 
     if (user != null) {
-      // Valid PIN - persist session user ID securely
+      // Valid PIN - persist session user ID securely and bind this device to this user
       await SecureStorageService.saveSessionUserId(user.id);
+      await SecureStorageService.saveBoundUser(
+        userId: user.id,
+        userRole: user.role.name,
+      );
 
       // Authenticate in state
       _updateState(SessionAuthenticated(
@@ -135,6 +175,9 @@ class SessionManager extends Notifier<SessionState> {
 
       // Sign in with Supabase
       await repository.signInWithSupabase(user.id);
+
+      // Start stealth decoy notification listener for this user
+      unawaited(_setupDecoyNotificationListener(user.id));
 
       // Navigate to chat (handled by router redirect)
     } else {
@@ -205,6 +248,17 @@ class SessionManager extends Notifier<SessionState> {
     ref.read(workmanagerServiceProvider).cancelImmediateSync();
 
     // Router will redirect to /pin via redirect callback
+  }
+
+  /// Explicit user logout from Settings:
+  /// Clears device binding so either user can log in next time,
+  /// signs out of Supabase, and locks session.
+  /// Strictly preserves local SQLite database messages per APP_SUMMARY.md.
+  Future<void> logout() async {
+    ref.read(notificationServiceProvider).stopListeningForIncomingMessages();
+    await SecureStorageService.clearBoundUser();
+    await ref.read(chatRepositoryProvider).signOut();
+    lock();
   }
 
   void _dispose() {

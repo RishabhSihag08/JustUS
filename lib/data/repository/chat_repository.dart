@@ -2,6 +2,7 @@ import '../../../domain/models/message.dart';
 import '../../../domain/models/conversation.dart';
 import '../../../domain/models/user.dart';
 import '../../../domain/models/reaction.dart';
+import '../../../domain/models/compass_credentials.dart';
 
 /// Abstract interface for chat repository
 abstract class ChatRepository {
@@ -82,4 +83,20 @@ abstract class ChatRepository {
 
   /// Master delete all chat history from both local device and remote Supabase database
   Future<void> masterDeleteAllChat(String conversationId);
+
+  /// Fetch compass credentials from Supabase and cache them locally
+  Future<Map<String, CompassCredentials>> fetchCompassCredentials();
+
+  /// Get compass credentials for a user role (from local cache or fallback)
+  Future<CompassCredentials> getCompassCredentials(String role);
+
+  /// Update compass credentials in Supabase and local cache
+  Future<void> updateCompassCredentials({
+    required String userId,
+    required double heading,
+    required String pin,
+  });
+
+  /// Clear device account binding
+  Future<void> clearDeviceBinding();
 }

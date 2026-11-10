@@ -118,7 +118,7 @@ class ChatNotifier extends _$ChatNotifier {
           .listen((indicators) {
         // Create domain TypingIndicator from table data
         final otherIndicator = indicators.where((t) => t.userId != userId).firstOrNull;
-        if (otherIndicator != null) {
+        if (otherIndicator != null && (otherIndicator.isTyping || otherIndicator.isRecording)) {
           final domainIndicator = TypingIndicator.fromTableData(
             conversationId: otherIndicator.conversationId,
             userId: otherIndicator.userId,
@@ -126,6 +126,8 @@ class ChatNotifier extends _$ChatNotifier {
             isRecording: otherIndicator.isRecording,
           );
           state = state.copyWith(typingIndicator: domainIndicator);
+        } else {
+          state = state.copyWith(typingIndicator: null);
         }
       });
 

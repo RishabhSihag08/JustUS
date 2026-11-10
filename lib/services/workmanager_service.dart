@@ -1,6 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/security/secure_storage_service.dart';
+import 'notification_service.dart';
 
 /// Background sync task name
 const String backgroundSyncTask = 'com.justus.backgroundSync';
@@ -56,11 +60,37 @@ class WorkManagerService {
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
-      await Supabase.initialize(
-        url: 'https://placeholder.supabase.co',
-        publishableKey: 'placeholder-key',
-      );
-    } catch (_) {}
+      try {
+        await dotenv.load(fileName: 'assets/.env');
+      } catch (_) {}
+
+      final url = dotenv.env['SUPABASE_URL'] ?? 'https://aptzqrejanzizuzornvx.supabase.co';
+      final anonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
+      if (url.isNotEmpty && anonKey.isNotEmpty) {
+        try {
+          await Supabase.initialize(url: url, publishableKey: anonKey);
+        } catch (_) {}
+      }
+
+      final boundUserId = await SecureStorageService.readBoundUserId();
+      if (boundUserId != null) {
+        final client = Supabase.instance.client;
+        final unread = await client
+            .from('messages')
+            .select('id, created_at')
+            .neq('sender_id', boundUserId)
+            .inFilter('status', ['sent', 'delivered'])
+            .order('created_at', ascending: false)
+            .limit(1);
+
+        if (unread.isNotEmpty) {
+          await NotificationService.showDecoyNotification();
+        }
+      }
+    } catch (e) {
+      debugPrint('Background sync task note: $e');
+    }
 
     debugPrint('Background sync task executed: $task');
     return true;

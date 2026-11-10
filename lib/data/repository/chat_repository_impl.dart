@@ -24,6 +24,7 @@ import '../../domain/models/message.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user.dart';
 import '../../domain/models/reaction.dart';
+import '../../domain/models/compass_credentials.dart';
 import '../../domain/enums.dart';
 import '../../../core/security/secure_storage_service.dart';
 import 'package:uuid/uuid.dart';
@@ -56,7 +57,7 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<User?> verifyPin(String pin) async {
     try {
-      // Call Supabase RPC function to verify PIN
+      // 1. Call Supabase RPC function to verify PIN
       final response = await _supabase.rpc('verify_pin', params: {'p_pin': pin});
 
       if (response != null) {
@@ -88,8 +89,41 @@ class ChatRepositoryImpl implements ChatRepository {
       debugPrint('verify_pin RPC note: $e');
     }
 
-    final user1Pin = dotenv.env['USER_1_PIN'] ?? '1234';
-    final user2Pin = dotenv.env['USER_2_PIN'] ?? '5678';
+    // 2. Direct Supabase query check (unhashed plain PIN or pin_hash)
+    try {
+      final rows = await _supabase
+          .from('users')
+          .select()
+          .or('pin.eq.$pin,pin_hash.eq.$pin')
+          .limit(1);
+      if (rows.isNotEmpty) {
+        final userData = rows.first;
+        final user = UserDto.fromJson(userData).toDomain();
+        await _usersDao.upsertUser(UsersTableCompanion(
+          id: Value(user.id),
+          role: Value(user.role.name),
+          pinHash: Value(user.pinHash),
+          displayName: Value(user.displayName),
+          avatarUrl: Value(user.avatarUrl),
+          fcmToken: Value(user.fcmToken),
+          lastSeenAt: Value(user.lastSeenAt),
+          isOnline: Value(user.isOnline),
+          createdAt: Value(user.createdAt),
+          updatedAt: Value(user.updatedAt),
+        ));
+        await SecureStorageService.saveSessionUserId(user.id);
+        return user;
+      }
+    } catch (e) {
+      debugPrint('Direct user PIN select note: $e');
+    }
+
+    // 3. Check local cached credentials in SecureStorageService (offline resilience)
+    final cached1 = await SecureStorageService.readCachedCompassCredentials('user_1');
+    final cached2 = await SecureStorageService.readCachedCompassCredentials('user_2');
+
+    final user1Pin = cached1?.pin ?? dotenv.env['USER_1_PIN'] ?? '1234';
+    final user2Pin = cached2?.pin ?? dotenv.env['USER_2_PIN'] ?? '5678';
 
     if (pin == user1Pin || pin == user2Pin || pin == '1111' || pin == '2222') {
       final isUser1 = pin == user1Pin || pin == '1111';
@@ -684,8 +718,18 @@ class ChatRepositoryImpl implements ChatRepository {
       ),
     );
 
-    // Also send via Supabase Realtime Presence
-    // This is handled by the RealtimeService
+    // Sync with Supabase Realtime table
+    try {
+      await _supabase.from('typing_indicators').upsert({
+        'conversation_id': conversationId,
+        'user_id': userId,
+        'is_typing': isTyping,
+        'is_recording': isRecording,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'conversation_id, user_id');
+    } catch (e) {
+      debugPrint('updateTypingIndicator Supabase error: $e');
+    }
   }
 
   @override
@@ -891,5 +935,111 @@ class ChatRepositoryImpl implements ChatRepository {
     } catch (e) {
       debugPrint('Supabase storage cleanup error: $e');
     }
+  }
+
+  @override
+  Future<Map<String, CompassCredentials>> fetchCompassCredentials() async {
+    final Map<String, CompassCredentials> result = {};
+
+    try {
+      final rows = await _supabase.from('users').select('id, role, compass_heading, pin, pin_hash');
+      for (final row in rows) {
+        final role = (row['role'] ?? '').toString();
+        if (role.isEmpty) continue;
+        final isUser1 = role == 'user_1' || role == 'user1';
+        final defaultHeading = isUser1 ? 120.0 : 260.0;
+        final defaultPin = isUser1 ? '1234' : '5678';
+
+        final heading = (row['compass_heading'] as num?)?.toDouble() ?? defaultHeading;
+        final pin = (row['pin'] ?? row['pin_hash'] ?? defaultPin).toString();
+        final userId = (row['id'] ?? (isUser1 ? user1Id : user2Id)).toString();
+
+        final creds = CompassCredentials(
+          userId: userId,
+          role: isUser1 ? 'user_1' : 'user_2',
+          heading: heading,
+          pin: pin,
+        );
+
+        result[creds.role] = creds;
+
+        // Cache locally for offline and cold-boot access
+        await SecureStorageService.cacheCompassCredentials(
+          role: creds.role,
+          heading: creds.heading,
+          pin: creds.pin,
+          userId: creds.userId,
+        );
+      }
+    } catch (e) {
+      debugPrint('fetchCompassCredentials error (using fallback cache): $e');
+    }
+
+    // Fill in any missing role from local cache or defaults
+    for (final role in ['user_1', 'user_2']) {
+      if (!result.containsKey(role)) {
+        result[role] = await getCompassCredentials(role);
+      }
+    }
+
+    return result;
+  }
+
+  @override
+  Future<CompassCredentials> getCompassCredentials(String role) async {
+    final cached = await SecureStorageService.readCachedCompassCredentials(role);
+    if (cached != null) return cached;
+
+    final isUser1 = role == 'user_1' || role == 'user1';
+    final defaultHeading = double.tryParse(dotenv.env[isUser1 ? 'USER_1_HEADING' : 'USER_2_HEADING'] ?? '') ??
+        (isUser1 ? 120.0 : 260.0);
+    final defaultPin = dotenv.env[isUser1 ? 'USER_1_PIN' : 'USER_2_PIN'] ?? (isUser1 ? '1234' : '5678');
+
+    return CompassCredentials(
+      userId: isUser1 ? user1Id : user2Id,
+      role: isUser1 ? 'user_1' : 'user_2',
+      heading: defaultHeading,
+      pin: defaultPin,
+    );
+  }
+
+  @override
+  Future<void> updateCompassCredentials({
+    required String userId,
+    required double heading,
+    required String pin,
+  }) async {
+    final isUser1 = userId == user1Id;
+    final role = isUser1 ? 'user_1' : 'user_2';
+
+    // 1. Update Supabase
+    try {
+      await _supabase.from('users').update({
+        'compass_heading': heading,
+        'pin': pin,
+        'pin_hash': pin,
+      }).eq('id', userId);
+    } catch (e) {
+      debugPrint('updateCompassCredentials Supabase note: $e');
+      // If compass_heading column isn't created yet on Supabase, attempt updating pin_hash
+      try {
+        await _supabase.from('users').update({
+          'pin_hash': pin,
+        }).eq('id', userId);
+      } catch (_) {}
+    }
+
+    // 2. Update local secure storage cache
+    await SecureStorageService.cacheCompassCredentials(
+      role: role,
+      heading: heading,
+      pin: pin,
+      userId: userId,
+    );
+  }
+
+  @override
+  Future<void> clearDeviceBinding() async {
+    await SecureStorageService.clearBoundUser();
   }
 }

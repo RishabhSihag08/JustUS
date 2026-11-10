@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/security/session_manager.dart';
+import 'services/notification_service.dart';
 
 /// Main App Widget
 class JustUsApp extends ConsumerWidget {
@@ -12,6 +13,11 @@ class JustUsApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+
+    // Ensure decoy notifications navigate strictly to the decoy compass screen
+    NotificationService.onNavigateToCompass = () {
+      router.go('/compass');
+    };
 
     // Listen to session changes for auto-lock
     ref.listen<SessionState>(sessionManagerProvider, (previous, next) {

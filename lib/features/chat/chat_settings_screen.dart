@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/security/session_manager.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/repository_providers.dart';
+import '../../../services/notification_service.dart';
 import 'chat_notifier.dart';
 
 /// Chat settings screen - Clean Slack Minimalist
@@ -21,10 +22,51 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
   bool _isExporting = false;
   bool _isImporting = false;
 
+  // Compass credentials & account state
+  double? _userHeading;
+  String? _userPin;
+  String _userRole = '';
+  String _userId = '';
+  bool _isSavingCredentials = false;
+
   @override
   void initState() {
     super.initState();
     _loadDisappearingTimer();
+    _loadUserCredentials();
+  }
+
+  Future<void> _loadUserCredentials() async {
+    final session = ref.read(sessionManagerProvider);
+    final (userId, userRole) = switch (session) {
+      SessionAuthenticated(:final userId, :final userRole) => (userId, userRole),
+      _ => ('', ''),
+    };
+
+    if (userId.isEmpty) return;
+
+    _userId = userId;
+    _userRole = userRole;
+
+    try {
+      final creds = await ref.read(chatRepositoryProvider).getCompassCredentials(userRole);
+      if (mounted) {
+        setState(() {
+          _userHeading = creds.heading;
+          _userPin = creds.pin;
+        });
+      }
+
+      // Fetch fresh credentials from Supabase
+      final freshMap = await ref.read(chatRepositoryProvider).fetchCompassCredentials();
+      final fresh = freshMap[userRole];
+      if (fresh != null && mounted) {
+        setState(() {
+          _userHeading = fresh.heading;
+          _userPin = fresh.pin;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadDisappearingTimer() async {
@@ -96,6 +138,14 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    _buildSectionHeader('COMPASS TRIGGER CREDENTIALS', isDark),
+                    _buildCompassCredentialsCard(isDark),
+                    const SizedBox(height: 24),
+
+                    _buildSectionHeader('ACCOUNT & DEVICE', isDark),
+                    _buildAccountCard(isDark),
+                    const SizedBox(height: 24),
+
                     _buildSectionHeader('DISAPPEARING MESSAGES', isDark),
                     _buildDisappearingCard(isDark),
                     const SizedBox(height: 24),
@@ -128,6 +178,481 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
           color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
         ),
       ),
+    );
+  }
+
+  Widget _buildCompassCredentialsCard(bool isDark) {
+    final headingText = _userHeading != null ? '${_userHeading!.round()}°' : '120°';
+    final pinDisplay = _userPin != null ? _userPin! : '1234';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF222529) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF35373B) : AppColors.purpleHaze,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.explore_rounded,
+                  color: AppColors.aubergine,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Compass Trigger & Secret PIN',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                      ),
+                    ),
+                    Text(
+                      'Secret Heading: $headingText  •  PIN: $pinDisplay',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 40),
+              foregroundColor: isDark ? Colors.white : AppColors.aubergine,
+              side: BorderSide(
+                color: isDark ? const Color(0xFF4A154B) : AppColors.aubergine,
+                width: 1,
+              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => _showEditCredentialsSheet(isDark),
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text(
+              'Change Heading & PIN',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 40),
+              foregroundColor: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+              side: BorderSide(
+                color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+                width: 1,
+              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              await NotificationService.showDecoyNotification();
+              if (mounted) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Decoy compass notification sent! Check your status bar.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.notifications_active_outlined, size: 16),
+            label: const Text(
+              'Test Decoy Notification',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditCredentialsSheet(bool isDark) {
+    double currentHeading = _userHeading ?? 120.0;
+    final headingController = TextEditingController(text: currentHeading.round().toString());
+    final pinController = TextEditingController(text: _userPin ?? '1234');
+    String? errorMessage;
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF1E2124) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (modalContext, setSheetState) {
+            final bottomInset = MediaQuery.of(modalContext).viewInsets.bottom;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: bottomInset + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Edit Compass Credentials',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : AppColors.carbon,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          color: isDark ? Colors.white70 : AppColors.midGray,
+                          onPressed: () => Navigator.pop(sheetContext),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Set the secret compass degree and 4-digit PIN for your account. Saved to Supabase without password hashing.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Heading input
+                    Text(
+                      'Secret Heading (Degrees 0 - 359)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Slider(
+                            value: currentHeading.clamp(0.0, 359.0),
+                            min: 0,
+                            max: 359,
+                            divisions: 359,
+                            activeColor: AppColors.aubergine,
+                            onChanged: (val) {
+                              setSheetState(() {
+                                currentHeading = val;
+                                headingController.text = val.round().toString();
+                              });
+                            },
+                          ),
+                        ),
+                        SizedBox(
+                          width: 60,
+                          child: TextField(
+                            controller: headingController,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppColors.carbon,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            decoration: InputDecoration(
+                              suffixText: '°',
+                              contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              final deg = double.tryParse(val);
+                              if (deg != null && deg >= 0 && deg < 360) {
+                                setSheetState(() {
+                                  currentHeading = deg;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // PIN input
+                    Text(
+                      'Secret PIN (4 Digits)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: pinController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.carbon,
+                        letterSpacing: 4,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '1234',
+                        counterText: '',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        errorMessage!,
+                        style: const TextStyle(color: Color(0xFFE01E5A), fontSize: 12),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 46),
+                        backgroundColor: AppColors.aubergine,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _isSavingCredentials
+                          ? null
+                          : () async {
+                              final pin = pinController.text.trim();
+                              final deg = double.tryParse(headingController.text.trim()) ?? currentHeading;
+
+                              if (pin.length < 4) {
+                                setSheetState(() {
+                                  errorMessage = 'PIN must be at least 4 digits';
+                                });
+                                return;
+                              }
+                              if (deg < 0 || deg >= 360) {
+                                setSheetState(() {
+                                  errorMessage = 'Heading must be between 0° and 359°';
+                                });
+                                return;
+                              }
+
+                              setSheetState(() {
+                                errorMessage = null;
+                              });
+
+                              setState(() => _isSavingCredentials = true);
+                              Navigator.pop(sheetContext);
+
+                              try {
+                                await ref.read(chatRepositoryProvider).updateCompassCredentials(
+                                  userId: _userId,
+                                  heading: deg,
+                                  pin: pin,
+                                );
+
+                                if (mounted) {
+                                  setState(() {
+                                    _userHeading = deg;
+                                    _userPin = pin;
+                                    _isSavingCredentials = false;
+                                  });
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Compass credentials updated: ${deg.round()}° & PIN saved'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  setState(() => _isSavingCredentials = false);
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to update credentials: $e'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      child: _isSavingCredentials
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text(
+                              'Save Credentials',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAccountCard(bool isDark) {
+    final roleName = _userRole == 'user_2' ? 'User Two' : 'User One';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF222529) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF35373B) : AppColors.fog,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF35373B) : AppColors.purpleHaze,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.person_outline_rounded,
+                  color: AppColors.aubergine,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      roleName,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFFD1D2D3) : AppColors.carbon,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF2BAC76),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Phone bound to this account',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 40),
+              foregroundColor: const Color(0xFFE01E5A),
+              side: BorderSide(
+                color: const Color(0xFFE01E5A).withValues(alpha: 0.5),
+                width: 1,
+              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => _showLogoutConfirmationDialog(isDark, roleName),
+            icon: const Icon(Icons.logout_rounded, size: 16),
+            label: const Text(
+              'Log Out of this Phone',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutConfirmationDialog(bool isDark, String roleName) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Log out of $roleName?'),
+          content: const Text(
+            'This will unbind this phone from your account and lock the app into compass mode.\n\nNext time, either User 1 or User 2 can log in.\n\nYour chat messages will remain safely stored on this device.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE01E5A),
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogCtx);
+                await ref.read(sessionManagerProvider.notifier).logout();
+              },
+              child: const Text('Log Out'),
+            ),
+          ],
+        );
+      },
     );
   }
 

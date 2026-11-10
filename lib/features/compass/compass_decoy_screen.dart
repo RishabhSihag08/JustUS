@@ -1,16 +1,19 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_compass/flutter_compass.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
 
 import 'widgets/compass_dial_painter.dart';
 import 'widgets/vault_opening_overlay.dart';
 import '../pin_pad/pin_pad_notifier.dart';
+import '../../core/security/device_lock_service.dart';
 import '../../core/security/session_manager.dart';
+import '../../core/security/secure_storage_service.dart';
+import '../../providers/repository_providers.dart';
 import '../../core/router/app_router.dart';
 
 /// Compass Decoy Screen
@@ -25,7 +28,7 @@ class CompassDecoyScreen extends ConsumerStatefulWidget {
 }
 
 class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   // Current heading in degrees (0.0 to 360.0)
   double _heading = 0.0;
   double _displayHeading = 0.0;
@@ -37,6 +40,13 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
   bool _isManualDragging = false;
   bool _isAuthenticating = false;
   bool _isInSecretZone = false;
+
+  // Device account binding & credentials state
+  String? _boundUserRole;
+  double _user1Heading = 120.0;
+  double _user2Heading = 260.0;
+  String _user1Pin = '1234';
+  String _user2Pin = '5678';
 
   // Vault opening animation state
   bool _showVaultOverlay = false;
@@ -58,18 +68,67 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
   void initState() {
     super.initState();
 
-    _smoothController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 180),
-    )..addListener(() {
-        if (!mounted) return;
-        final t = Curves.easeOutCubic.transform(_smoothController.value);
-        setState(() {
-          _displayHeading = _normalizeHeading(_animStartHeading + (_animTargetHeading - _animStartHeading) * t);
+    _smoothController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 180),
+        )..addListener(() {
+          if (!mounted) return;
+          final t = Curves.easeOutCubic.transform(_smoothController.value);
+          setState(() {
+            _displayHeading = _normalizeHeading(
+              _animStartHeading + (_animTargetHeading - _animStartHeading) * t,
+            );
+          });
         });
-      });
 
     _initCompassSensor();
+    WidgetsBinding.instance.addObserver(this);
+    _loadCredentialsAndBinding();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadCredentialsAndBinding();
+    }
+  }
+
+  Future<void> _loadCredentialsAndBinding() async {
+    final bound = await SecureStorageService.readBoundUserRole();
+    final repo = ref.read(chatRepositoryProvider);
+
+    final creds1 = await repo.getCompassCredentials('user_1');
+    final creds2 = await repo.getCompassCredentials('user_2');
+
+    if (mounted) {
+      setState(() {
+        _boundUserRole = bound;
+        _user1Heading = creds1.heading;
+        _user1Pin = creds1.pin;
+        _user2Heading = creds2.heading;
+        _user2Pin = creds2.pin;
+      });
+    }
+
+    // Refresh asynchronously from Supabase
+    unawaited(repo.fetchCompassCredentials().then((credsMap) {
+      if (!mounted) return;
+      final c1 = credsMap['user_1'];
+      final c2 = credsMap['user_2'];
+      if (c1 != null || c2 != null) {
+        setState(() {
+          if (c1 != null) {
+            _user1Heading = c1.heading;
+            _user1Pin = c1.pin;
+          }
+          if (c2 != null) {
+            _user2Heading = c2.heading;
+            _user2Pin = c2.pin;
+          }
+        });
+      }
+    }).catchError((_) {}));
   }
 
   void _initCompassSensor() {
@@ -112,14 +171,17 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
     _smoothController.forward(from: 0.0);
   }
 
-  /// Subtle tactile tumbler feedback when rotating into the secret heading range
+  /// Subtle tactile tumbler feedback when rotating into the secret heading range.
+  /// Respects device account binding: if bound to User 1, only User 1 angle triggers haptics;
+  /// if bound to User 2, only User 2 angle triggers haptics; if unbound, both trigger.
   void _checkSecretAngleHaptic(double heading) {
-    final user1Heading = double.tryParse(dotenv.env['USER_1_HEADING'] ?? '') ?? 120.0;
-    final user2Heading = double.tryParse(dotenv.env['USER_2_HEADING'] ?? '') ?? 260.0;
     const tolerance = 4.0;
+    final allowUser1 = _boundUserRole == null || _boundUserRole == 'user_1' || _boundUserRole == 'user1';
+    final allowUser2 = _boundUserRole == null || _boundUserRole == 'user_2' || _boundUserRole == 'user2';
 
-    final inZone = _isHeadingMatching(heading, user1Heading, tolerance) ||
-        _isHeadingMatching(heading, user2Heading, tolerance);
+    final inZone =
+        (allowUser1 && _isHeadingMatching(heading, _user1Heading, tolerance)) ||
+        (allowUser2 && _isHeadingMatching(heading, _user2Heading, tolerance));
 
     if (inZone && !_isInSecretZone) {
       // Gentle mechanical tumbler click
@@ -141,33 +203,32 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _compassSubscription?.cancel();
     _smoothController.dispose();
     super.dispose();
   }
 
-  /// Handle center reticle tap: Check for secret heading trigger or toggle reference bearing
+  /// Handle center reticle tap: Check for secret heading trigger or toggle reference bearing.
+  /// Respects device account binding: if bound to User 1, User 2 heading is completely ignored
+  /// and behaves as an authentic decoy action (toggles reference bearing).
   Future<void> _handleCenterTap() async {
     if (_showVaultOverlay || _isAuthenticating) return;
 
     final current = _normalizeHeading(_heading);
-
-    // Read secret headings and PINs from environment
-    final user1Heading = double.tryParse(dotenv.env['USER_1_HEADING'] ?? '') ?? 120.0;
-    final user2Heading = double.tryParse(dotenv.env['USER_2_HEADING'] ?? '') ?? 260.0;
     const tolerance = 4.0;
 
-    final user1Pin = dotenv.env['USER_1_PIN'] ?? '1234';
-    final user2Pin = dotenv.env['USER_2_PIN'] ?? '5678';
+    final allowUser1 = _boundUserRole == null || _boundUserRole == 'user_1' || _boundUserRole == 'user1';
+    final allowUser2 = _boundUserRole == null || _boundUserRole == 'user_2' || _boundUserRole == 'user2';
 
-    if (_isHeadingMatching(current, user1Heading, tolerance)) {
+    if (allowUser1 && _isHeadingMatching(current, _user1Heading, tolerance)) {
       // Secret Trigger: User 1 - Strong haptic confirmation & launch Vault Opening
       HapticFeedback.heavyImpact();
-      _startVaultOpening(user1Pin);
-    } else if (_isHeadingMatching(current, user2Heading, tolerance)) {
+      _startVaultOpening(_user1Pin);
+    } else if (allowUser2 && _isHeadingMatching(current, _user2Heading, tolerance)) {
       // Secret Trigger: User 2 - Strong haptic confirmation & launch Vault Opening
       HapticFeedback.heavyImpact();
-      _startVaultOpening(user2Pin);
+      _startVaultOpening(_user2Pin);
     } else {
       // Innocent decoy action: Toggle reference bearing (standard Apple / Android Compass behavior)
       _toggleReferenceBearing();
@@ -246,7 +307,10 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
           builder: (context, setModalState) {
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,8 +336,14 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Use True North', style: TextStyle(color: Colors.white)),
-                      subtitle: const Text('Requires location calibration', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      title: const Text(
+                        'Use True North',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      subtitle: const Text(
+                        'Requires location calibration',
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
                       value: _useTrueNorth,
                       activeTrackColor: const Color(0x66FF4500),
                       activeThumbColor: const Color(0xFFFF4500),
@@ -285,21 +355,36 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                     const SizedBox(height: 8),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Sensor Status', style: TextStyle(color: Colors.white)),
+                      title: const Text(
+                        'Sensor Status',
+                        style: TextStyle(color: Colors.white),
+                      ),
                       subtitle: Text(
-                        _hasSensorData ? 'Hardware Magnetometer Active' : 'Touch Fallback Active',
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        _hasSensorData
+                            ? 'Hardware Magnetometer Active'
+                            : 'Touch Fallback Active',
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
                       ),
                       trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: _hasSensorData ? const Color(0x332BAC76) : const Color(0x33FFB020),
+                          color: _hasSensorData
+                              ? const Color(0x332BAC76)
+                              : const Color(0x33FFB020),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           _hasSensorData ? 'Calibrated' : 'Manual',
                           style: TextStyle(
-                            color: _hasSensorData ? const Color(0xFF2BAC76) : const Color(0xFFFFB020),
+                            color: _hasSensorData
+                                ? const Color(0xFF2BAC76)
+                                : const Color(0xFFFFB020),
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -308,8 +393,14 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                     ),
                     const ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text('Magnetic Declination', style: TextStyle(color: Colors.white)),
-                      trailing: Text('0° 12\' E', style: TextStyle(color: Colors.white70)),
+                      title: Text(
+                        'Magnetic Declination',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      trailing: Text(
+                        '0° 12\' E',
+                        style: TextStyle(color: Colors.white70),
+                      ),
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -339,6 +430,10 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
 
     return PopScope(
       canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        DeviceLockService.moveTaskToBack();
+      },
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
@@ -348,269 +443,299 @@ class _CompassDecoyScreenState extends ConsumerState<CompassDecoyScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Top Bar with Minimalist Settings Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const SizedBox(width: 40),
-                    // Decoy Title (Hidden/Subtle)
-                    const SizedBox.shrink(),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.settings_outlined,
-                        color: Colors.white70,
-                        size: 24,
-                      ),
-                      tooltip: 'Compass Settings',
-                      onPressed: _showSettingsModal,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
                     ),
-                  ],
-                ),
-              ),
-
-              // Center Instrument Assembly
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Heading Display Readout (e.g. 15° N)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '${activeHeading.round()}°',
-                          style: const TextStyle(
-                            fontSize: 52,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                            letterSpacing: -1.0,
-                            fontFamily: 'Inter',
+                        const SizedBox(width: 40),
+                        // Decoy Title (Hidden/Subtle)
+                        const SizedBox.shrink(),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.settings_outlined,
+                            color: Colors.white70,
+                            size: 24,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _getCardinalDirection(activeHeading),
-                          style: const TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w400,
-                            color: Colors.white,
-                            fontFamily: 'Inter',
-                          ),
+                          tooltip: 'Compass Settings',
+                          onPressed: _showSettingsModal,
                         ),
                       ],
                     ),
+                  ),
 
-                    // Reference Bearing Sub-Indicator (if active)
-                    if (_referenceBearing != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Locked: ${_referenceBearing!.round()}° (${_getBearingDiffText(activeHeading, _referenceBearing!)})',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFFFF4500),
-                        ),
-                      ),
-                    ] else
-                      const SizedBox(height: 20),
-
-                    const SizedBox(height: 16),
-
-                    // Compass Dial Wrap Container
-                    SizedBox(
-                      width: dialSize,
-                      height: dialSize,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Outer Bezel Body with radial depth and metallic border
-                          Container(
-                            width: dialSize,
-                            height: dialSize,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const RadialGradient(
-                                center: Alignment.center,
-                                radius: 0.9,
-                                colors: [
-                                  Color(0xFF202124),
-                                  Color(0xFF17181A),
-                                  Color(0xFF0F1011),
-                                ],
-                                stops: [0.0, 0.75, 1.0],
+                  // Center Instrument Assembly
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Heading Display Readout (e.g. 15° N)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              '${activeHeading.round()}°',
+                              style: const TextStyle(
+                                fontSize: 52,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                                letterSpacing: -1.0,
+                                fontFamily: 'Inter',
                               ),
-                              border: Border.all(
-                                color: const Color(0x1AFFFFFF),
-                                width: 1.0,
-                              ),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0xE6000000),
-                                  blurRadius: 40,
-                                  offset: Offset(0, 16),
-                                ),
-                              ],
                             ),
-                            alignment: Alignment.center,
-                            child: Container(
-                              // Inner Recessed Disc
-                              width: dialSize * 0.90,
-                              height: dialSize * 0.90,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const RadialGradient(
-                                  center: Alignment.center,
-                                  radius: 0.9,
-                                  colors: [
-                                    Color(0xFF1E1F23),
-                                    Color(0xFF161719),
-                                    Color(0xFF131416),
-                                  ],
-                                  stops: [0.0, 0.65, 1.0],
-                                ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0xB3000000),
-                                    blurRadius: 12,
-                                    spreadRadius: -2,
-                                  ),
-                                ],
+                            const SizedBox(width: 8),
+                            Text(
+                              _getCardinalDirection(activeHeading),
+                              style: const TextStyle(
+                                fontSize: 48,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white,
+                                fontFamily: 'Inter',
                               ),
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Rotating Dial Face (Counter-clockwise rotation by heading)
-                                  Transform.rotate(
-                                    angle: -activeHeading * (pi / 180),
-                                    child: CustomPaint(
-                                      size: Size(dialSize * 0.90, dialSize * 0.90),
-                                      painter: CompassDialPainter(
-                                        currentHeading: activeHeading,
-                                        referenceBearing: _referenceBearing,
-                                      ),
-                                    ),
-                                  ),
+                            ),
+                          ],
+                        ),
 
-                                  // Center Fixed Crosshair & Reticle
-                                  CustomPaint(
-                                    size: Size(dialSize * 0.90, dialSize * 0.90),
-                                    painter: FixedReticlePainter(),
-                                  ),
-                                ],
-                              ),
+                        // Reference Bearing Sub-Indicator (if active)
+                        if (_referenceBearing != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Locked: ${_referenceBearing!.round()}° (${_getBearingDiffText(activeHeading, _referenceBearing!)})',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFFFF4500),
                             ),
                           ),
+                        ] else
+                          const SizedBox(height: 20),
 
-                          // Outer Heading Indicator Notch (Top Orange Pointer at 12 o'clock)
-                          Positioned(
-                            top: -1.0,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 3.5,
+                        const SizedBox(height: 16),
+
+                        // Compass Dial Wrap Container
+                        SizedBox(
+                          width: dialSize,
+                          height: dialSize,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Outer Bezel Body with radial depth and metallic border
+                              Container(
+                                width: dialSize,
+                                height: dialSize,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const RadialGradient(
+                                    center: Alignment.center,
+                                    radius: 0.9,
+                                    colors: [
+                                      Color(0xFF202124),
+                                      Color(0xFF17181A),
+                                      Color(0xFF0F1011),
+                                    ],
+                                    stops: [0.0, 0.75, 1.0],
+                                  ),
+                                  border: Border.all(
+                                    color: const Color(0x1AFFFFFF),
+                                    width: 1.0,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0xE6000000),
+                                      blurRadius: 40,
+                                      offset: Offset(0, 16),
+                                    ),
+                                  ],
+                                ),
+                                alignment: Alignment.center,
+                                child: Container(
+                                  // Inner Recessed Disc
+                                  width: dialSize * 0.90,
+                                  height: dialSize * 0.90,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFF4500),
-                                    borderRadius: BorderRadius.circular(2),
+                                    shape: BoxShape.circle,
+                                    gradient: const RadialGradient(
+                                      center: Alignment.center,
+                                      radius: 0.9,
+                                      colors: [
+                                        Color(0xFF1E1F23),
+                                        Color(0xFF161719),
+                                        Color(0xFF131416),
+                                      ],
+                                      stops: [0.0, 0.65, 1.0],
+                                    ),
                                     boxShadow: const [
                                       BoxShadow(
-                                        color: Color(0x99FF4500),
-                                        blurRadius: 8,
+                                        color: Color(0xB3000000),
+                                        blurRadius: 12,
+                                        spreadRadius: -2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Rotating Dial Face (Counter-clockwise rotation by heading)
+                                      Transform.rotate(
+                                        angle: -activeHeading * (pi / 180),
+                                        child: CustomPaint(
+                                          size: Size(
+                                            dialSize * 0.90,
+                                            dialSize * 0.90,
+                                          ),
+                                          painter: CompassDialPainter(
+                                            currentHeading: activeHeading,
+                                            referenceBearing: _referenceBearing,
+                                          ),
+                                        ),
+                                      ),
+
+                                      // Center Fixed Crosshair & Reticle
+                                      CustomPaint(
+                                        size: Size(
+                                          dialSize * 0.90,
+                                          dialSize * 0.90,
+                                        ),
+                                        painter: FixedReticlePainter(),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(height: 1),
-                                CustomPaint(
-                                  size: const Size(12, 7),
-                                  painter: _TrianglePointerPainter(),
+                              ),
+
+                              // Outer Heading Indicator Notch (Top Orange Pointer at 12 o'clock)
+                              Positioned(
+                                top: -1.0,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 3.5,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF4500),
+                                        borderRadius: BorderRadius.circular(2),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x99FF4500),
+                                            blurRadius: 8,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 1),
+                                    CustomPaint(
+                                      size: const Size(12, 7),
+                                      painter: _TrianglePointerPainter(),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+
+                              // Interactive Gesture Layer (Touch Rotation Fallback + Secret Center Tap)
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTapUp: (details) {
+                                  final center = Offset(
+                                    dialSize / 2,
+                                    dialSize / 2,
+                                  );
+                                  final distance =
+                                      (details.localPosition - center).distance;
+                                  if (distance <= 48.0) {
+                                    _handleCenterTap();
+                                  }
+                                },
+                                onPanStart: (details) {
+                                  final center = Offset(
+                                    dialSize / 2,
+                                    dialSize / 2,
+                                  );
+                                  final diff = details.localPosition - center;
+                                  if (diff.distance > 48.0) {
+                                    _isManualDragging = true;
+                                    _panStartTouchAngle = atan2(
+                                      diff.dy,
+                                      diff.dx,
+                                    );
+                                    _headingAtPanStart = _heading;
+                                  }
+                                },
+                                onPanUpdate: (details) {
+                                  if (_isManualDragging) {
+                                    final center = Offset(
+                                      dialSize / 2,
+                                      dialSize / 2,
+                                    );
+                                    final diff = details.localPosition - center;
+                                    final currentAngle = atan2(
+                                      diff.dy,
+                                      diff.dx,
+                                    );
+                                    final deltaAngleDeg =
+                                        (currentAngle - _panStartTouchAngle) *
+                                        180 /
+                                        pi;
+                                    final newHeading = _normalizeHeading(
+                                      _headingAtPanStart - deltaAngleDeg,
+                                    );
+
+                                    _checkSecretAngleHaptic(newHeading);
+
+                                    setState(() {
+                                      _heading = newHeading;
+                                      _displayHeading = newHeading;
+                                    });
+                                  }
+                                },
+                                onPanEnd: (_) {
+                                  _isManualDragging = false;
+                                },
+                                onPanCancel: () {
+                                  _isManualDragging = false;
+                                },
+                                child: const SizedBox.expand(),
+                              ),
+                            ],
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                          // Interactive Gesture Layer (Touch Rotation Fallback + Secret Center Tap)
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTapUp: (details) {
-                              final center = Offset(dialSize / 2, dialSize / 2);
-                              final distance = (details.localPosition - center).distance;
-                              if (distance <= 48.0) {
-                                _handleCenterTap();
-                              }
-                            },
-                            onPanStart: (details) {
-                              final center = Offset(dialSize / 2, dialSize / 2);
-                              final diff = details.localPosition - center;
-                              if (diff.distance > 48.0) {
-                                _isManualDragging = true;
-                                _panStartTouchAngle = atan2(diff.dy, diff.dx);
-                                _headingAtPanStart = _heading;
-                              }
-                            },
-                            onPanUpdate: (details) {
-                              if (_isManualDragging) {
-                                final center = Offset(dialSize / 2, dialSize / 2);
-                                final diff = details.localPosition - center;
-                                final currentAngle = atan2(diff.dy, diff.dx);
-                                final deltaAngleDeg = (currentAngle - _panStartTouchAngle) * 180 / pi;
-                                final newHeading = _normalizeHeading(_headingAtPanStart - deltaAngleDeg);
-
-                                _checkSecretAngleHaptic(newHeading);
-
-                                setState(() {
-                                  _heading = newHeading;
-                                  _displayHeading = newHeading;
-                                });
-                              }
-                            },
-                            onPanEnd: (_) {
-                              _isManualDragging = false;
-                            },
-                            onPanCancel: () {
-                              _isManualDragging = false;
-                            },
-                            child: const SizedBox.expand(),
-                          ),
-                        ],
+                  // Minimal Bottom Spacing & Home Indicator Bar
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Container(
+                      width: 140,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0x40FFFFFF),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  ],
-                ),
-              ),
-
-              // Minimal Bottom Spacing & Home Indicator Bar
-              Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: Container(
-                  width: 140,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0x40FFFFFF),
-                    borderRadius: BorderRadius.circular(2),
                   ),
+                ],
+              ),
+            ),
+
+            // Fullscreen Vault Opening Loading Animation & Transition Screen
+            if (_showVaultOverlay)
+              Positioned.fill(
+                child: VaultOpeningOverlay(
+                  authFuture: _authFuture ?? Future.value(),
+                  onTransitionReady: _onVaultOpeningComplete,
                 ),
               ),
-            ],
-          ),
+          ],
         ),
-
-        // Fullscreen Vault Opening Loading Animation & Transition Screen
-        if (_showVaultOverlay)
-          Positioned.fill(
-            child: VaultOpeningOverlay(
-              authFuture: _authFuture ?? Future.value(),
-              onTransitionReady: _onVaultOpeningComplete,
-            ),
-          ),
-      ],
-    ),
-  ),
-);
+      ),
+    );
   }
 
   String _getBearingDiffText(double heading, double ref) {
