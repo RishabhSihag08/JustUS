@@ -81,6 +81,11 @@ class PinPadNotifier extends Notifier<PinPadState> {
     );
   }
 
+  /// Programmatically submit a PIN (e.g. from Decoy Compass secret heading trigger)
+  Future<void> submitPin(String pin) async {
+    await _verifyPin(pin, 0);
+  }
+
   /// Verify the entered PIN
   Future<void> _verifyPin(String pin, int attemptCount) async {
     // Read PINs from environment

@@ -52,7 +52,6 @@ class SessionManager extends Notifier<SessionState> {
 
   Timer? _lockoutTimer;
   Timer? _appLifecycleTimer;
-  bool _isAppInBackground = false;
   final _streamController = StreamController<SessionState>.broadcast();
 
   @override
@@ -72,6 +71,7 @@ class SessionManager extends Notifier<SessionState> {
   /// Setup app lifecycle listener for auto-lock
   void _setupAppLifecycleListener() {
     AppLifecycleListener(
+      onInactive: () => _onAppInactive(),
       onHide: () => _onAppHidden(),
       onPause: () => _onAppPaused(),
       onDetach: () => _onAppDetached(),
@@ -79,39 +79,37 @@ class SessionManager extends Notifier<SessionState> {
     );
   }
 
+  /// Called when app becomes inactive (e.g. app switcher / recents opened)
+  void _onAppInactive() {
+    _immediateLockIfAuthenticated();
+  }
+
   /// Called when app goes to background/hidden
   void _onAppHidden() {
-    _isAppInBackground = true;
-    _scheduleAutoLock();
+    _immediateLockIfAuthenticated();
   }
 
   /// Called when app is paused (Android) or resigns active (iOS)
   void _onAppPaused() {
-    _isAppInBackground = true;
-    _scheduleAutoLock();
+    _immediateLockIfAuthenticated();
   }
 
   /// Called when app is detached
   void _onAppDetached() {
-    _isAppInBackground = true;
     lock();
   }
 
   /// Called when app comes to foreground
   void _onAppResumed() {
-    _isAppInBackground = false;
     _cancelAutoLock();
   }
 
-  /// Schedule auto-lock after a short delay
-  void _scheduleAutoLock() {
+  /// Immediately lock the session if authenticated to shield from recents switcher
+  void _immediateLockIfAuthenticated() {
     _cancelAutoLock();
-    // Small delay to allow for quick app switches
-    _appLifecycleTimer = Timer(const Duration(milliseconds: 500), () {
-      if (_isAppInBackground && state is SessionAuthenticated) {
-        lock();
-      }
-    });
+    if (state is SessionAuthenticated) {
+      lock();
+    }
   }
 
   /// Cancel scheduled auto-lock

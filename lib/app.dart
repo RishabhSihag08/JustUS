@@ -16,7 +16,7 @@ class JustUsApp extends ConsumerWidget {
     // Listen to session changes for auto-lock
     ref.listen<SessionState>(sessionManagerProvider, (previous, next) {
       if (next is SessionLocked) {
-        router.go('/pin');
+        router.go('/compass');
       }
     });
 
