@@ -20,11 +20,35 @@ class ChatScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(chatNotifierProvider.notifier).markAsRead();
+      ref.read(chatNotifierProvider.notifier).setPresence(true);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(chatNotifierProvider.notifier).setPresence(true);
+      ref.read(chatNotifierProvider.notifier).markAsRead();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      ref.read(chatNotifierProvider.notifier).setPresence(false);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    ref.read(chatNotifierProvider.notifier).setPresence(false);
     _scrollController.dispose();
     super.dispose();
   }

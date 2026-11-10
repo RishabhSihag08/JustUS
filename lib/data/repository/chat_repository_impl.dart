@@ -80,6 +80,7 @@ class ChatRepositoryImpl implements ChatRepository {
             createdAt: Value(user.createdAt),
             updatedAt: Value(user.updatedAt),
           ));
+          await SecureStorageService.saveSessionUserId(user.id);
           return user;
         }
       }
@@ -119,6 +120,7 @@ class ChatRepositoryImpl implements ChatRepository {
         updatedAt: Value(user.updatedAt),
       ));
 
+      await SecureStorageService.saveSessionUserId(user.id);
       return user;
     }
 
@@ -269,11 +271,17 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<void> sendMediaMessage(String localPath, String type,
-      {String? caption, bool isViewOnce = false}) async {
+  Future<void> sendMediaMessage(
+    String localPath,
+    String type, {
+    String? caption,
+    bool isViewOnce = false,
+    String? senderId,
+    String? messageId,
+  }) async {
     final conv = await getOrCreateConversation();
-    final senderId = await SecureStorageService.readSessionUserId() ?? user1Id;
-    final messageId = const Uuid().v4();
+    final actualSenderId = senderId ?? await SecureStorageService.readSessionUserId() ?? user1Id;
+    final actualMessageId = messageId ?? const Uuid().v4();
     final now = DateTime.now();
 
     final isDisappearing = conv.disappearingTimer != null;
@@ -286,9 +294,9 @@ class ChatRepositoryImpl implements ChatRepository {
           );
 
     final message = Message(
-      id: messageId,
+      id: actualMessageId,
       conversationId: conv.id,
-      senderId: senderId,
+      senderId: actualSenderId,
       type: messageType,
       content: caption,
       mediaUrl: localPath,
@@ -308,13 +316,13 @@ class ChatRepositoryImpl implements ChatRepository {
       final file = File(localPath);
       if (await file.exists()) {
         final ext = p.extension(localPath);
-        final storagePath = '$senderId/$messageId$ext';
+        final storagePath = '$actualSenderId/$actualMessageId$ext';
         await _supabase.storage.from('chat-media').upload(storagePath, file);
         final remoteUrl = _supabase.storage.from('chat-media').getPublicUrl(storagePath);
 
         final remoteMessage = message.copyWith(mediaUrl: remoteUrl);
         await _supabase.from('messages').insert(MessageDto.fromDomain(remoteMessage).toJson());
-        await _messagesDao.updateDeliveryStatus(messageId, MessageStatus.sent.name, DateTime.now());
+        await _messagesDao.updateDeliveryStatus(actualMessageId, MessageStatus.sent.name, DateTime.now());
       }
     } catch (e) {
       debugPrint('Media message remote sync note: $e');
@@ -322,18 +330,23 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<void> sendVoiceNote(String audioPath, Duration duration) async {
+  Future<void> sendVoiceNote(
+    String audioPath,
+    Duration duration, {
+    String? senderId,
+    String? messageId,
+  }) async {
     final conv = await getOrCreateConversation();
-    final senderId = await SecureStorageService.readSessionUserId() ?? user1Id;
-    final messageId = const Uuid().v4();
+    final actualSenderId = senderId ?? await SecureStorageService.readSessionUserId() ?? user1Id;
+    final actualMessageId = messageId ?? const Uuid().v4();
     final now = DateTime.now();
     final isDisappearing = conv.disappearingTimer != null;
     final expiresAt = isDisappearing ? now.add(conv.disappearingTimer!) : null;
 
     final message = Message(
-      id: messageId,
+      id: actualMessageId,
       conversationId: conv.id,
-      senderId: senderId,
+      senderId: actualSenderId,
       type: MessageType.voice,
       content: 'Voice note',
       mediaUrl: audioPath,
@@ -354,7 +367,7 @@ class ChatRepositoryImpl implements ChatRepository {
     try {
       final file = File(audioPath);
       if (await file.exists()) {
-        final storagePath = '$senderId/$messageId.m4a';
+        final storagePath = '$actualSenderId/$actualMessageId.m4a';
         await _supabase.storage.from('chat-media').upload(
           storagePath,
           file,
@@ -370,7 +383,7 @@ class ChatRepositoryImpl implements ChatRepository {
           status: MessageStatus.sent,
         );
         await _supabase.from('messages').insert(MessageDto.fromDomain(remoteMessage).toJson());
-        await _messagesDao.updateDeliveryStatus(messageId, MessageStatus.sent.name, DateTime.now());
+        await _messagesDao.updateDeliveryStatus(actualMessageId, MessageStatus.sent.name, DateTime.now());
       }
     } catch (e) {
       debugPrint('Voice note remote sync note: $e');
@@ -402,14 +415,49 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<void> markConversationRead(String conversationId, String userId) async {
-    // Call Supabase RPC
-    await _supabase.rpc('mark_messages_read', params: {
-      'p_conversation_id': conversationId,
-      'p_reader_id': userId,
-    });
+    // 1. Update local Drift messages from the partner to read
+    final now = DateTime.now();
+    try {
+      await (_database.update(_database.messagesTable)
+            ..where((m) =>
+                m.conversationId.equals(conversationId) &
+                m.senderId.isNotValue(userId) &
+                m.status.isNotValue('read')))
+          .write(MessagesTableCompanion(
+        status: const Value('read'),
+        readAt: Value(now),
+        deliveredAt: Value(now),
+        updatedAt: Value(now),
+      ));
+    } catch (e) {
+      debugPrint('Local markConversationRead error: $e');
+    }
 
-    // Update local messages to read
-    // This would need a bulk update method in DAO
+    // 2. Call Supabase RPC, with direct update fallback
+    try {
+      await _supabase.rpc('mark_messages_read', params: {
+        'p_conversation_id': conversationId,
+        'p_reader_id': userId,
+      });
+    } catch (e) {
+      debugPrint('RPC mark_messages_read fallback to direct update: $e');
+      try {
+        final nowUtc = DateTime.now().toUtc().toIso8601String();
+        await _supabase
+            .from('messages')
+            .update({
+              'status': 'read',
+              'read_at': nowUtc,
+              'delivered_at': nowUtc,
+              'updated_at': nowUtc,
+            })
+            .eq('conversation_id', conversationId)
+            .neq('sender_id', userId)
+            .neq('status', 'read');
+      } catch (err) {
+        debugPrint('Direct mark_messages_read error: $err');
+      }
+    }
   }
 
   @override
@@ -614,12 +662,12 @@ class ChatRepositoryImpl implements ChatRepository {
           .from('users')
           .update({
             'is_online': isOnline,
-            'last_seen_at': now.toIso8601String(),
-            'updated_at': now.toIso8601String(),
+            'last_seen_at': now.toUtc().toIso8601String(),
+            'updated_at': now.toUtc().toIso8601String(),
           })
           .eq('id', userId);
     } catch (e) {
-      // Will sync later
+      debugPrint('updateUserPresence Supabase note: $e');
     }
   }
 
@@ -806,8 +854,42 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<void> clearChat(String conversationId) async {
+    await masterDeleteAllChat(conversationId);
+  }
+
+  @override
+  Future<void> masterDeleteAllChat(String conversationId) async {
+    // 1. Delete all messages, reactions, starred messages, media uploads from local Drift SQLite
     await (_database.delete(_database.messagesTable)
           ..where((m) => m.conversationId.equals(conversationId)))
         .go();
+    await _database.delete(_database.reactionsTable).go();
+    await _database.delete(_database.starredMessagesTable).go();
+    await _database.delete(_database.mediaUploadsTable).go();
+
+    // 2. Delete all messages from remote Supabase table
+    // (ON DELETE CASCADE in Postgres will automatically delete reactions, starred_messages, media_uploads)
+    try {
+      await _supabase
+          .from('messages')
+          .delete()
+          .eq('conversation_id', conversationId);
+    } catch (e) {
+      debugPrint('Supabase clear messages error: $e');
+    }
+
+    // 3. Clean up uploaded files in Supabase Storage chat-media bucket
+    try {
+      for (final folder in [user1Id, user2Id]) {
+        final files = await _supabase.storage.from('chat-media').list(path: folder);
+        if (files.isNotEmpty) {
+          await _supabase.storage.from('chat-media').remove(
+            files.map((f) => '$folder/${f.name}').toList(),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Supabase storage cleanup error: $e');
+    }
   }
 }

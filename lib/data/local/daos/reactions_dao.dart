@@ -35,4 +35,9 @@ class ReactionsDao extends DatabaseAccessor<AppDatabase> with _$ReactionsDaoMixi
   Future<List<ReactionsTableData>> getAllReactions() {
     return select(reactionsTable).get();
   }
+
+  /// Delete all reactions
+  Future<int> deleteAll() {
+    return delete(reactionsTable).go();
+  }
 }

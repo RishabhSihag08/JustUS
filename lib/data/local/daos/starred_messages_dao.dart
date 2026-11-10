@@ -66,4 +66,9 @@ class StarredMessagesDao extends DatabaseAccessor<AppDatabase> with _$StarredMes
   Stream<List<StarredMessagesTableData>> watchStarredByUser(String userId) {
     return (select(starredMessagesTable)..where((s) => s.userId.equals(userId))).watch();
   }
+
+  /// Delete all starred messages
+  Future<int> deleteAll() {
+    return delete(starredMessagesTable).go();
+  }
 }

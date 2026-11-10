@@ -46,7 +46,7 @@ class MessageBubble extends ConsumerWidget {
     final type = domainMessage?.type.name ?? (message?['type'] as String? ?? 'text');
     final text = domainMessage?.content ?? (message?['text'] as String? ?? '');
     final time = domainMessage != null
-        ? '${domainMessage!.createdAt.hour.toString().padLeft(2, '0')}:${domainMessage!.createdAt.minute.toString().padLeft(2, '0')}'
+        ? _formatTime(context, domainMessage!.createdAt.toLocal())
         : (message?['time'] as String? ?? '');
     final status = domainMessage?.status.name ?? (message?['status'] as String? ?? 'sent');
     final isStarred = domainMessage?.isStarred ?? (message?['isStarred'] as bool? ?? false);
@@ -199,6 +199,17 @@ class MessageBubble extends ConsumerWidget {
     }
   }
 
+  String _formatTime(BuildContext context, DateTime dt) {
+    final local = dt.toLocal();
+    final is24Hour = MediaQuery.alwaysUse24HourFormatOf(context);
+    if (is24Hour) {
+      return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    } else {
+      final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+      return '$hour:${local.minute.toString().padLeft(2, '0')}';
+    }
+  }
+
   /// Compact text bubble with inline or bottom-aligned timestamp + SVG read receipt
   Widget _buildTextBubble(
     ThemeData theme,
@@ -219,6 +230,25 @@ class MessageBubble extends ConsumerWidget {
 
     final hasReply = repliedMessage != null || message?['replyTo'] != null;
 
+    final messageContent = Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.end,
+      spacing: 8,
+      runSpacing: 2,
+      children: [
+        Text(
+          text,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 15,
+            height: 1.35,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        _buildFooterRow(time, status, isStarred, isDark),
+      ],
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -231,27 +261,19 @@ class MessageBubble extends ConsumerWidget {
         ),
         border: Border.all(color: borderColor, width: 1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (hasReply) _buildReplyPreview(theme, colorScheme, isDark),
-          Text(
-            text,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 15,
-              height: 1.35,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Align(
-            alignment: Alignment.bottomRight,
-            child: _buildFooterRow(time, status, isStarred, isDark),
-          ),
-        ],
-      ),
+      child: hasReply
+          ? IntrinsicWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildReplyPreview(theme, colorScheme, isDark),
+                  const SizedBox(height: 2),
+                  messageContent,
+                ],
+              ),
+            )
+          : messageContent,
     );
   }
 

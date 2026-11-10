@@ -21,10 +21,10 @@ abstract class ChatRepository {
   Future<void> sendTextMessage(Message message);
 
   /// Send a media message (image, video, voice, document, view-once)
-  Future<void> sendMediaMessage(String localPath, String type, {String? caption, bool isViewOnce = false});
+  Future<void> sendMediaMessage(String localPath, String type, {String? caption, bool isViewOnce = false, String? senderId, String? messageId});
 
   /// Send a voice note
-  Future<void> sendVoiceNote(String audioPath, Duration duration);
+  Future<void> sendVoiceNote(String audioPath, Duration duration, {String? senderId, String? messageId});
 
   /// Update message delivery status
   Future<void> updateMessageStatus(String messageId, String status);
@@ -79,4 +79,7 @@ abstract class ChatRepository {
 
   /// Clear chat history for conversation
   Future<void> clearChat(String conversationId);
+
+  /// Master delete all chat history from both local device and remote Supabase database
+  Future<void> masterDeleteAllChat(String conversationId);
 }

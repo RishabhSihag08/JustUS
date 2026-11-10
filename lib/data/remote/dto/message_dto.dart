@@ -80,13 +80,13 @@ class MessageDto {
       ),
       isStarred: isStarred,
       isDisappearing: isDisappearing,
-      expiresAt: expiresAt,
+      expiresAt: expiresAt?.toLocal(),
       viewOnceViewed: viewOnceViewed,
-      viewOnceViewedAt: viewOnceViewedAt,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
-      deliveredAt: deliveredAt,
-      readAt: readAt,
+      viewOnceViewedAt: viewOnceViewedAt?.toLocal(),
+      createdAt: createdAt.toLocal(),
+      updatedAt: updatedAt.toLocal(),
+      deliveredAt: deliveredAt?.toLocal(),
+      readAt: readAt?.toLocal(),
     );
   }
 
@@ -107,13 +107,13 @@ class MessageDto {
       status: message.status.name,
       isStarred: message.isStarred,
       isDisappearing: message.isDisappearing,
-      expiresAt: message.expiresAt,
+      expiresAt: message.expiresAt?.toUtc(),
       viewOnceViewed: message.viewOnceViewed,
-      viewOnceViewedAt: message.viewOnceViewedAt,
-      createdAt: message.createdAt,
-      updatedAt: message.updatedAt,
-      deliveredAt: message.deliveredAt,
-      readAt: message.readAt,
+      viewOnceViewedAt: message.viewOnceViewedAt?.toUtc(),
+      createdAt: message.createdAt.toUtc(),
+      updatedAt: message.updatedAt.toUtc(),
+      deliveredAt: message.deliveredAt?.toUtc(),
+      readAt: message.readAt?.toUtc(),
     );
   }
 }

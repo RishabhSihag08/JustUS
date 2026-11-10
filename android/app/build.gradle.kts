@@ -18,7 +18,7 @@ extensions.configure<ApplicationExtension> {
     }
 
     defaultConfig {
-        applicationId = "com.justus.justus"
+        applicationId = "com.rishabh.justus"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

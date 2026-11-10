@@ -30,7 +30,7 @@ class PresenceHeader extends ConsumerWidget {
     final String partnerName = (otherUser?.displayName != null && otherUser!.displayName!.isNotEmpty)
         ? otherUser.displayName!
         : (otherUser?.role == UserRole.user1 ? 'User One' : 'User Two');
-    final isOnline = otherUser?.isOnline ?? true;
+    final isOnline = otherUser?.isOnline ?? false;
     final isTyping = typingIndicator?.isTyping ?? false;
     final isRecording = typingIndicator?.isRecording ?? false;
 

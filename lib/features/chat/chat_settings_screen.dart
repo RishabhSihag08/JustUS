@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/security/session_manager.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/repository_providers.dart';
+import 'chat_notifier.dart';
 
 /// Chat settings screen - Clean Slack Minimalist
 class ChatSettingsScreen extends ConsumerStatefulWidget {
@@ -521,9 +522,9 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(
-                Icons.delete_sweep_rounded,
+                Icons.delete_forever_rounded,
                 color: Color(0xFFE01E5A),
-                size: 20,
+                size: 22,
               ),
             ),
             const SizedBox(width: 12),
@@ -532,15 +533,16 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Clear conversation',
+                    'Delete Chat Everywhere (Master Wipe)',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFFE01E5A),
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    'Delete all message history on this device',
+                    'Permanently delete all messages and media from both phones & the database',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? const Color(0xFFABABAD) : AppColors.midGray,
@@ -565,9 +567,9 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
       builder: (dialogCtx) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Clear Chat History?'),
+          title: const Text('Master Delete Chat History?'),
           content: const Text(
-            'This will permanently delete all messages and media stored on this phone. This action cannot be undone.',
+            'This will permanently delete ALL messages, voice notes, media files, and reactions from both phones and the cloud database.\n\nThis action is irreversible.',
           ),
           actions: [
             TextButton(
@@ -581,14 +583,11 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
               onPressed: () async {
                 Navigator.pop(dialogCtx);
                 try {
-                  final conv = await ref
-                      .read(chatRepositoryProvider)
-                      .getOrCreateConversation();
-                  await ref.read(chatRepositoryProvider).clearChat(conv.id);
+                  await ref.read(chatNotifierProvider.notifier).clearAllChatHistory();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Chat history cleared'),
+                        content: Text('All chat history permanently deleted everywhere'),
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
@@ -597,14 +596,14 @@ class _ChatSettingsScreenState extends ConsumerState<ChatSettingsScreen> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Failed to clear chat: $e'),
+                        content: Text('Failed to delete chat: $e'),
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
                   }
                 }
               },
-              child: const Text('Clear All'),
+              child: const Text('Delete Everywhere'),
             ),
           ],
         );

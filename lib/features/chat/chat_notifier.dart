@@ -156,6 +156,10 @@ class ChatNotifier extends _$ChatNotifier {
       // Initialize realtime subscriptions
       await _initializeRealtime(conversation.id, userId);
 
+      // Mark active user online and mark conversation as read
+      unawaited(_repository.updateUserPresence(userId, true).catchError((_) {}));
+      unawaited(markAsRead().catchError((_) {}));
+
       // Background sync from remote
       unawaited(ref.read(syncRepositoryProvider).performFullSync().catchError((_) {}));
 
@@ -195,9 +199,17 @@ class ChatNotifier extends _$ChatNotifier {
     final realtimeService = ref.read(realtimeServiceProvider);
 
     // Subscribe to messages
-    realtimeService.subscribeToConversation(conversationId, (payload) async {
+    realtimeService.subscribeToConversation(conversationId, (record, isDelete) async {
       try {
-        final dto = MessageDto.fromJson(payload);
+        if (isDelete) {
+          final msgId = record['id'] as String?;
+          if (msgId != null) {
+            await _database.messagesDao.deleteMessage(msgId);
+          }
+          return;
+        }
+
+        final dto = MessageDto.fromJson(record);
         final domainMsg = dto.toDomain();
         await _database.messagesDao.insertMessage(
           MessagesTableCompanion(
@@ -224,6 +236,11 @@ class ChatNotifier extends _$ChatNotifier {
             readAt: Value(domainMsg.readAt),
           ),
         );
+
+        // If incoming message from partner, acknowledge read
+        if (domainMsg.senderId != userId) {
+          unawaited(markAsRead().catchError((_) {}));
+        }
       } catch (_) {}
     });
 
@@ -279,6 +296,14 @@ class ChatNotifier extends _$ChatNotifier {
       try {
         if (otherUserId != userId) {
           await _database.usersDao.updateOnlineStatus(otherUserId, isOnline, DateTime.now());
+          if (state.otherUser?.id == otherUserId) {
+            state = state.copyWith(
+              otherUser: state.otherUser?.copyWith(
+                isOnline: isOnline,
+                lastSeenAt: DateTime.now(),
+              ),
+            );
+          }
         }
       } catch (_) {}
     });
@@ -380,9 +405,10 @@ class ChatNotifier extends _$ChatNotifier {
     final isDisappearing = conversation.disappearingTimer != null;
     final expiresAt = isDisappearing ? DateTime.now().add(conversation.disappearingTimer!) : null;
     final messageType = isViewOnce ? MessageType.viewOnce : type;
+    final messageId = const Uuid().v4();
 
     final message = Message(
-      id: const Uuid().v4(),
+      id: messageId,
       conversationId: conversation.id,
       senderId: userId,
       type: messageType,
@@ -405,6 +431,8 @@ class ChatNotifier extends _$ChatNotifier {
       messageType.name,
       caption: caption,
       isViewOnce: isViewOnce,
+      senderId: userId,
+      messageId: messageId,
     );
   }
 
@@ -418,7 +446,50 @@ class ChatNotifier extends _$ChatNotifier {
 
     if (userId == null) return;
 
-    await _repository.sendVoiceNote(audioPath, duration);
+    final conversation = await _repository.getOrCreateConversation();
+    final isDisappearing = conversation.disappearingTimer != null;
+    final expiresAt = isDisappearing ? DateTime.now().add(conversation.disappearingTimer!) : null;
+    final messageId = const Uuid().v4();
+
+    final message = Message(
+      id: messageId,
+      conversationId: conversation.id,
+      senderId: userId,
+      type: MessageType.voice,
+      content: 'Voice note',
+      mediaUrl: audioPath,
+      mediaDuration: duration.inMilliseconds,
+      mediaMimeType: 'audio/m4a',
+      status: MessageStatus.pending,
+      isDisappearing: isDisappearing,
+      expiresAt: expiresAt,
+      viewOnceViewed: false,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    // Optimistically add to local state
+    state = state.copyWith(messages: [...state.messages, message]);
+
+    await _repository.sendVoiceNote(
+      audioPath,
+      duration,
+      senderId: userId,
+      messageId: messageId,
+    );
+  }
+
+  /// Delete all chat history permanently from local DB and remote database/storage
+  Future<void> clearAllChatHistory() async {
+    final conversation = await _repository.getOrCreateConversation();
+    await _repository.masterDeleteAllChat(conversation.id);
+    state = state.copyWith(
+      messages: [],
+      reactionsByMessageId: {},
+      starredMessageIds: {},
+      replyingTo: null,
+      editingMessage: null,
+    );
   }
 
   /// Start replying to a message
@@ -658,6 +729,18 @@ class ChatNotifier extends _$ChatNotifier {
 
     final conversation = await _repository.getOrCreateConversation();
     await _repository.markConversationRead(conversation.id, userId);
+  }
+
+  /// Update user presence online/offline
+  Future<void> setPresence(bool isOnline) async {
+    final session = ref.read(sessionManagerProvider);
+    final userId = switch (session) {
+      SessionAuthenticated(:final userId) => userId,
+      _ => null,
+    };
+
+    if (userId == null) return;
+    await _repository.updateUserPresence(userId, isOnline);
   }
 
   /// Set disappearing messages timer

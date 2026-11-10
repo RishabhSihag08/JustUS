@@ -30,11 +30,11 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDevKeyJustUSAndroid1234567890',
-    appId: '1:123456789012:android:abcdef0123456789',
-    messagingSenderId: '123456789012',
-    projectId: 'justus-dev',
-    storageBucket: 'justus-dev.appspot.com',
+    apiKey: 'AIzaSyCOFbha--Ys0OxK7tBOdDx1Dc0x1NkNwmc',
+    appId: '1:241956386139:android:7f489aefec440abaf5167e',
+    messagingSenderId: '241956386139',
+    projectId: 'justus-754',
+    storageBucket: 'justus-754.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

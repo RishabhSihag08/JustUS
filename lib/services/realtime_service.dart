@@ -9,7 +9,7 @@ class RealtimeService {
   RealtimeService(this._supabase);
 
   /// Subscribe to a conversation's messages
-  RealtimeChannel subscribeToConversation(String conversationId, void Function(Map<String, dynamic>) onMessage) {
+  RealtimeChannel subscribeToConversation(String conversationId, void Function(Map<String, dynamic> record, bool isDelete) onMessage) {
     final channelName = 'conversation-$conversationId';
 
     if (_channels.containsKey(channelName)) {
@@ -22,13 +22,10 @@ class RealtimeService {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'messages',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'conversation_id',
-            value: conversationId,
-          ),
           callback: (payload) {
-            onMessage(payload.newRecord);
+            final isDelete = payload.eventType == PostgresChangeEvent.delete;
+            final record = isDelete ? payload.oldRecord : payload.newRecord;
+            onMessage(record, isDelete);
           },
         )
         .subscribe();
@@ -94,7 +91,7 @@ class RealtimeService {
 
   /// Subscribe to user presence
   RealtimeChannel subscribeToPresence(String conversationId, void Function(String, bool) onPresenceChange) {
-    final channelName = 'presence-$conversationId';
+    const channelName = 'presence-channel';
 
     if (_channels.containsKey(channelName)) {
       return _channels[channelName]!;
@@ -106,15 +103,12 @@ class RealtimeService {
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'users',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'conversation_id',
-            value: conversationId,
-          ),
           callback: (payload) {
-            final userId = payload.newRecord['id'] as String;
-            final isOnline = payload.newRecord['is_online'] as bool;
-            onPresenceChange(userId, isOnline);
+            final userId = payload.newRecord['id'] as String?;
+            final isOnline = payload.newRecord['is_online'] as bool? ?? false;
+            if (userId != null) {
+              onPresenceChange(userId, isOnline);
+            }
           },
         )
         .subscribe();

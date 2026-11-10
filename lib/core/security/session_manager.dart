@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'secure_storage_service.dart';
 import '../../providers/repository_providers.dart';
 
 /// Session state sealed class
@@ -125,7 +126,10 @@ class SessionManager extends Notifier<SessionState> {
     final user = await repository.verifyPin(pin);
 
     if (user != null) {
-      // Valid PIN - authenticate
+      // Valid PIN - persist session user ID securely
+      await SecureStorageService.saveSessionUserId(user.id);
+
+      // Authenticate in state
       _updateState(SessionAuthenticated(
         userId: user.id,
         userRole: user.role.name,
@@ -187,6 +191,11 @@ class SessionManager extends Notifier<SessionState> {
   void lock() {
     _cancelAutoLock();
     _lockoutTimer?.cancel();
+
+    final currentSession = state;
+    if (currentSession is SessionAuthenticated) {
+      unawaited(ref.read(chatRepositoryProvider).updateUserPresence(currentSession.userId, false).catchError((_) {}));
+    }
 
     // Clear session state to require PIN re-entry
     _updateState(const SessionLocked());

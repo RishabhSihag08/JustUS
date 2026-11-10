@@ -41,13 +41,13 @@ extension MessagesTableDataToDomain on MessagesTableData {
       status: status.toMessageStatus,
       isStarred: isStarred,
       isDisappearing: isDisappearing,
-      expiresAt: expiresAt,
+      expiresAt: expiresAt?.toLocal(),
       viewOnceViewed: viewOnceViewed,
-      viewOnceViewedAt: viewOnceViewedAt,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
-      deliveredAt: deliveredAt,
-      readAt: readAt,
+      viewOnceViewedAt: viewOnceViewedAt?.toLocal(),
+      createdAt: createdAt.toLocal(),
+      updatedAt: updatedAt.toLocal(),
+      deliveredAt: deliveredAt?.toLocal(),
+      readAt: readAt?.toLocal(),
     );
   }
 }

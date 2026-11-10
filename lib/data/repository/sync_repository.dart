@@ -109,6 +109,11 @@ class SyncRepository {
         await _messagesDao.insertAllMessages(
           messages.map(_messageToCompanion).toList(),
         );
+      } else if (since == null) {
+        // If remote has 0 messages on full sync, clear local messages to reflect master wipe
+        await _messagesDao.deleteAll();
+        await _reactionsDao.deleteAll();
+        await _starredDao.deleteAll();
       }
     } catch (_) {}
   }
